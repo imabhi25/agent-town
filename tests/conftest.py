@@ -6,6 +6,16 @@ import redis.asyncio as aioredis
 
 from app.config import settings
 from app.dispatcher import STREAM
+from app.retry import DELAYED_KEY, DLQ_STREAM
+
+TRUNCATE_ALL = "TRUNCATE goals, tasks, jobs, job_outputs, outbox, events CASCADE"
+
+
+async def _clean_redis(r) -> None:
+    await r.delete(STREAM, DLQ_STREAM, DELAYED_KEY)
+    keys = [k async for k in r.scan_iter(match="worker:hb:*")]
+    if keys:
+        await r.delete(*keys)
 
 
 def _unavailable(reason: str):
@@ -21,8 +31,10 @@ async def pool():
         p = await asyncpg.create_pool(settings.database_url, min_size=1, max_size=10)
     except (OSError, asyncpg.PostgresError) as e:
         _unavailable(f"Postgres not available: {e}")
-    await p.execute("TRUNCATE goals, tasks, jobs, job_outputs, outbox, events CASCADE")
+    await p.execute(TRUNCATE_ALL)
     yield p
+    # Clean up after the test too, so a finished run leaves no rows behind.
+    await p.execute(TRUNCATE_ALL)
     await p.close()
 
 
@@ -34,9 +46,9 @@ async def redis():
     except OSError as e:
         await r.aclose()
         _unavailable(f"Redis not available: {e}")
-    await r.delete(STREAM)
+    await _clean_redis(r)
     yield r
-    await r.delete(STREAM)
+    await _clean_redis(r)
     await r.aclose()
 
 

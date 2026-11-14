@@ -36,6 +36,7 @@ class GoalIn(BaseModel):
 class JobIn(BaseModel):
     type: str = Field(min_length=1)
     payload: dict = Field(default_factory=dict)
+    max_attempts: int = Field(default=5, ge=1, le=10)
 
 
 @app.get("/health")
@@ -69,14 +70,15 @@ async def create_job(
     async with pool.acquire() as conn, conn.transaction():
         row = await conn.fetchrow(
             """
-            INSERT INTO jobs (type, payload, idempotency_key)
-            VALUES ($1, $2::jsonb, $3)
+            INSERT INTO jobs (type, payload, idempotency_key, max_attempts)
+            VALUES ($1, $2::jsonb, $3, $4)
             ON CONFLICT (idempotency_key) DO NOTHING
             RETURNING id
             """,
             body.type,
             _json(body.payload),
             idempotency_key,
+            body.max_attempts,
         )
         if row is None:
             existing = await conn.fetchrow(

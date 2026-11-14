@@ -39,6 +39,9 @@ jobs:
           cache: pip
       - run: pip install -e ".[dev]"
       - name: Load schema
-        run: PGPASSWORD=agent psql -h localhost -U agent -d agent_town -f migrations/001_init.sql
+        run: |
+          for f in migrations/*.sql; do
+            PGPASSWORD=agent psql -v ON_ERROR_STOP=1 -h localhost -U agent -d agent_town -f "$f"
+          done
       - run: ruff check .
       - run: pytest
