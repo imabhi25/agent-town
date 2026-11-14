@@ -289,7 +289,8 @@ async def test_open_circuit_delays_jobs_without_burning_attempts(client, pool, r
         await workers.stop()
     assert all(r["attempts"] == 1 for r in await pool.fetch("SELECT attempts FROM jobs"))
     types = [
-        r["type"] for r in await pool.fetch("SELECT type FROM events WHERE type LIKE 'circuit.%'")
+        r["type"]
+        for r in await pool.fetch("SELECT type FROM events WHERE type LIKE 'circuit.%' ORDER BY id")
     ]
     assert types == ["circuit.opened", "circuit.closed"]
     assert ids
