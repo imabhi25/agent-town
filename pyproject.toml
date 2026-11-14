@@ -22,6 +22,7 @@ packages = ["app", "app.providers"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
+markers = ["slow: takes several seconds; still runs in CI"]
 
 [tool.ruff]
 line-length = 100
