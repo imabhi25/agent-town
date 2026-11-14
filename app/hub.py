@@ -21,6 +21,7 @@ import asyncpg
 from redis.asyncio import Redis
 
 from app.event_publisher import EVENTS_STREAM, parse_event
+from app.stats import compute_stats
 
 log = logging.getLogger("hub")
 
@@ -214,6 +215,7 @@ async def build_snapshot(
     if worker_ids is None:
         worker_ids = sorted([k.split(":", 2)[2] async for k in redis.scan_iter("worker:hb:*")])
     entries = await redis.xrevrange(EVENTS_STREAM, max=up_to, count=SNAPSHOT_EVENTS)
+    stats = await compute_stats(pool, redis, worker_ids=worker_ids)
     return {
         "type": "snapshot",
         "goals": [
@@ -238,6 +240,7 @@ async def build_snapshot(
             "succeeded": counts.get("succeeded", 0),
             "dead": counts.get("dead", 0),
         },
+        "stats": stats,
         "events": [parse_event(sid, f) for sid, f in reversed(entries)],
         "last_event_id": up_to if up_to != "+" else (entries[0][0] if entries else "0-0"),
     }

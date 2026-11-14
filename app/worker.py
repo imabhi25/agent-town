@@ -526,6 +526,15 @@ class WorkerPool:
         self.mover: asyncio.Task | None = None
         self.tasks: dict[str, asyncio.Task] = {}
         self._stop = asyncio.Event()
+        self._next_number = size + 1
+
+    def new_worker_id(self) -> str:
+        """A fresh id for a replacement worker: ids are never reused within one pool."""
+        while f"worker-{self._next_number}" in self.tasks:
+            self._next_number += 1
+        wid = f"worker-{self._next_number}"
+        self._next_number += 1
+        return wid
 
     async def start(self) -> None:
         await ensure_group(self.redis)
@@ -586,7 +595,8 @@ class WorkerPool:
         )
         await asyncio.gather(*pending, return_exceptions=True)
         # A graceful shutdown deregisters; a crash is left to expire.
-        await self.redis.delete(*(heartbeat_key(w) for w in self.tasks))
+        if self.tasks:  # DEL with no keys is an error (every worker may have been killed)
+            await self.redis.delete(*(heartbeat_key(w) for w in self.tasks))
         self.tasks.clear()
         self.heartbeats.clear()
         self.mover = None

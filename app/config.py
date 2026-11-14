@@ -40,6 +40,12 @@ class Settings(BaseSettings):
     # Redis command budget (Upstash free: 500K/month). Past the guard ratio, live mode is off.
     redis_monthly_limit: int = 500_000
     redis_budget_guard_ratio: float = 0.9
+    # --- chaos and load (step 5) ---
+    flood_max: int = 2000  # most mock jobs one flood request may create (100 in the live demo)
+    chaos_rate_capacity: float = 20  # per-IP token bucket on chaos endpoints
+    chaos_rate_per_sec: float = 1.0
+    load_generator: bool = False  # keeps a local system lightly busy; always OFF in the live demo
+    load_interval: float = 2.0  # seconds between load generator ticks
     # --- live demo profile (free-tier hosting) ---
     live_demo: bool = False
     embedded_workers: bool = False  # run dispatcher + workers inside the API process
@@ -60,6 +66,8 @@ class Settings(BaseSettings):
             # "Live demo" profile: few, quiet workers so a free Redis (500K commands/month) and a
             # free Postgres (compute hours) last. Overrides explicit values on purpose: one switch.
             self.embedded_workers = True
+            self.flood_max = min(self.flood_max, 100)
+            self.load_generator = False  # nobody is watching; it would keep the system awake
             self.worker_count = 2
             self.heartbeat_interval = 10.0
             self.heartbeat_ttl = 30.0

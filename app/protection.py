@@ -118,6 +118,19 @@ class GoalGuard:
         if self.gate is not None:
             self.gate.touch()
 
+    async def check_chaos(self, request: Request) -> tuple[int, str, dict] | None:
+        """Per-IP limit for the chaos endpoints (they are public in the demo)."""
+        ok, retry_after = await self.bucket.take(
+            f"ratelimit:chaos:{self.client_ip(request)}",
+            settings.chaos_rate_capacity,
+            settings.chaos_rate_per_sec,
+        )
+        if ok:
+            self.touch()
+            return None
+        wait = max(1, int(retry_after + 0.999))
+        return 429, f"Too many chaos requests. Try again in {wait}s.", {"Retry-After": str(wait)}
+
     async def check(self, request: Request) -> tuple[int, str, dict] | None:
         """None if the goal may be created, else (status, message, headers)."""
         if not self.live_available:

@@ -8,16 +8,19 @@ from fastapi import FastAPI, Header, HTTPException, Request, WebSocket, WebSocke
 from pydantic import BaseModel, Field
 
 from app import goals
+from app.chaos_api import router as chaos_router
 from app.config import settings
 from app.dispatcher import run_dispatcher
 from app.event_publisher import run_event_publisher
 from app.hub import EventHub, build_snapshot
 from app.jobs import MockFieldRejected
 from app.jobs import create_job as insert_job
+from app.loadgen import run_load_generator
 from app.protection import GoalGuard
 from app.reconcile import reconcile
 from app.redis_budget import CommandBudget, CountingRedis
 from app.sleep import SleepGate, run_sleeper
+from app.stats import compute_stats
 from app.worker import build_worker_pool
 
 
@@ -43,6 +46,10 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(budget.run(stop)),
         asyncio.create_task(run_sleeper(gate, stop)),
     ]
+    if settings.load_generator and not settings.live_demo:
+        background.append(
+            asyncio.create_task(run_load_generator(pool, stop, settings.load_interval))
+        )
     app.state.hub = EventHub(
         redis,
         block_ms=settings.worker_block_ms,
@@ -68,6 +75,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Agent Town", lifespan=lifespan)
+app.include_router(chaos_router)
 
 
 class GoalIn(BaseModel):
@@ -97,6 +105,11 @@ async def healthz(request: Request):
         "live": True if guard is None else guard.live_available,
         "sleeping": bool(gate and gate.sleeping),
     }
+
+
+@app.get("/stats")
+async def get_stats(request: Request):
+    return await compute_stats(request.app.state.pool, request.app.state.redis)
 
 
 @app.get("/state")

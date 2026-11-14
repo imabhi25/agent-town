@@ -14,7 +14,7 @@
 - [x] Task dependencies: enqueue only when dependencies finish
 - [x] Events stream + WebSocket gateway (batched ~15 updates/sec)
 - [ ] Integration tests with testcontainers: kill-worker, crash between commit and XACK, duplicate submit, DLQ, retry
-- [ ] Synthetic load generator
+- [x] Synthetic load generator
 
 ## Week 3: visual and controls
 - [ ] React + TypeScript + PixiJS city map (queue, workers, DLQ, downstream)
