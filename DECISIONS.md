@@ -14,3 +14,14 @@ The API writes the job and an outbox row in one transaction. A dispatcher publis
 
 ## 4. Mock LLM provider
 Public demo and CI use a mock provider with latency and 429/500/timeouts, so chaos tests are reproducible and visitors cannot run up an API bill. Real Gemini is used for the planner and a capped number of worker calls.
+
+## 5. Worker flow (Day 4)
+`app/worker.py` runs N asyncio tasks (`worker-1..N`) in one Redis consumer group, each doing `XREADGROUP ... ">"` with a short block timeout. For each message:
+1. If `jobs.status` is already `succeeded` (or the job is gone), XACK and skip.
+2. Claim: `UPDATE jobs SET status='running', locked_by, started_at, attempts=attempts+1 WHERE id=$1 AND status != 'succeeded'` plus a `job.started` event in one transaction. Zero rows: XACK and skip.
+3. Call the provider (mock). On success, ONE transaction: guarded `UPDATE ... status='succeeded'`, and only if it matched a row, insert `job_outputs` (unique on job_id) and `job.succeeded`. Commit, THEN XACK.
+4. On a provider error (429/500/timeout) the job is marked `failed`, a `job.failed` event is written, and the message is XACKed. Day 5 replaces this with retries and a DLQ.
+
+Crash behaviour: `kill_worker` cancels the task. Only `ProviderError` and `TimeoutError` are caught, `CancelledError` is not, and no XACK is in a `finally`. A killed worker leaves the job `running` and the message pending, which is what the Day 6 XAUTOCLAIM recovery picks up.
+
+Known limit: the claim only guards against `succeeded`. If the same job is delivered to two workers while the first is still `running`, both call the provider (at-least-once). Completion is still single-effect because the guarded UPDATE lets only one writer insert the output and the `job.succeeded` event. Day 6 (heartbeats, claim ownership) narrows this window.

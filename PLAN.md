@@ -4,7 +4,7 @@
 - [x] Day 1: repo, Docker Compose, FastAPI skeleton, CI
 - [x] Day 2: schema; POST /goals stub and POST /jobs with Idempotency-Key (+ outbox row)
 - [x] Day 3: dispatcher moving outbox rows into a Redis Stream (tested against real Postgres + Redis)
-- [ ] Day 4: worker pool (consumer group), mock LLM (latency, 429/500/timeouts)
+- [x] Day 4: worker pool (consumer group), mock LLM (latency, 429/500/timeouts)
 - [ ] Day 5: retries (exponential backoff + full jitter), max attempts, DLQ stream
 - [ ] Day 6: XAUTOCLAIM recovery, heartbeats, transactional completion
 - [ ] Day 7: buffer. Done when a worker killed mid-job still completes the job once in effect.
