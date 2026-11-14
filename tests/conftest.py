@@ -6,13 +6,14 @@ import redis.asyncio as aioredis
 
 from app.config import settings
 from app.dispatcher import STREAM
+from app.event_publisher import EVENTS_STREAM
 from app.retry import DELAYED_KEY, DLQ_STREAM
 
 TRUNCATE_ALL = "TRUNCATE goals, tasks, jobs, job_outputs, outbox, events CASCADE"
 
 
 async def _clean_redis(r) -> None:
-    await r.delete(STREAM, DLQ_STREAM, DELAYED_KEY)
+    await r.delete(STREAM, DLQ_STREAM, DELAYED_KEY, EVENTS_STREAM)
     # Heartbeat keys and the daily Gemini counters must not leak between tests.
     for pattern in ("worker:hb:*", "gemini:calls:*"):
         keys = [k async for k in r.scan_iter(match=pattern)]
