@@ -1,11 +1,13 @@
 import asyncio
 from contextlib import asynccontextmanager
+from uuid import UUID
 
 import asyncpg
 import redis.asyncio as aioredis
 from fastapi import FastAPI, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from app import goals
 from app.config import settings
 from app.dispatcher import run_dispatcher
 
@@ -46,11 +48,41 @@ async def health():
 
 @app.post("/goals", status_code=201)
 async def create_goal(body: GoalIn, request: Request):
-    """Stub: stores the goal. The Gemini planner is added in week 2."""
-    row = await request.app.state.pool.fetchrow(
-        "INSERT INTO goals (prompt) VALUES ($1) RETURNING id", body.prompt
+    """Create a goal and queue its planner job (type 'planner') in one transaction.
+
+    A worker plans it later; the tasks appear with goal.planned / task.created events.
+    """
+    pool: asyncpg.Pool = request.app.state.pool
+    async with pool.acquire() as conn, conn.transaction():
+        goal_id = await goals.create_goal(conn, body.prompt)
+    return {"id": str(goal_id), "status": "planning"}
+
+
+@app.get("/goals/{goal_id}")
+async def get_goal(goal_id: UUID, request: Request):
+    pool: asyncpg.Pool = request.app.state.pool
+    goal = await pool.fetchrow(
+        "SELECT id, prompt, status, plan_source FROM goals WHERE id = $1", goal_id
     )
-    return {"id": str(row["id"]), "status": "planning"}
+    if goal is None:
+        raise HTTPException(status_code=404, detail="goal not found")
+    tasks = await pool.fetch(
+        """
+        SELECT id, key, name, description, depends_on, needs_approval, status
+        FROM tasks WHERE goal_id = $1 ORDER BY key
+        """,
+        goal_id,
+    )
+    return {
+        "id": str(goal["id"]),
+        "prompt": goal["prompt"],
+        "status": goal["status"],
+        "plan_source": goal["plan_source"],
+        "tasks": [
+            {**dict(t), "id": str(t["id"]), "depends_on": [str(d) for d in t["depends_on"]]}
+            for t in tasks
+        ],
+    }
 
 
 @app.post("/jobs", status_code=201)
