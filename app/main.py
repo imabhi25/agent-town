@@ -1,4 +1,5 @@
 import asyncio
+import json
 from contextlib import asynccontextmanager
 from uuid import UUID
 
@@ -58,11 +59,33 @@ async def create_goal(body: GoalIn, request: Request):
     return {"id": str(goal_id), "status": "planning"}
 
 
+@app.post("/tasks/{task_id}/approve")
+async def approve_task(task_id: UUID, request: Request):
+    return await _decide(request, task_id, goals.approve_task, "approved")
+
+
+@app.post("/tasks/{task_id}/reject")
+async def reject_task(task_id: UUID, request: Request):
+    return await _decide(request, task_id, goals.reject_task, "rejected")
+
+
+async def _decide(request: Request, task_id: UUID, action, result: str):
+    pool: asyncpg.Pool = request.app.state.pool
+    try:
+        async with pool.acquire() as conn, conn.transaction():
+            await action(conn, task_id)
+    except LookupError:
+        raise HTTPException(status_code=404, detail="task not found") from None
+    except goals.NotAwaitingApproval as e:
+        raise HTTPException(status_code=409, detail=f"task is {e}, not awaiting approval") from None
+    return {"id": str(task_id), "status": result}
+
+
 @app.get("/goals/{goal_id}")
 async def get_goal(goal_id: UUID, request: Request):
     pool: asyncpg.Pool = request.app.state.pool
     goal = await pool.fetchrow(
-        "SELECT id, prompt, status, plan_source FROM goals WHERE id = $1", goal_id
+        "SELECT id, prompt, status, plan_source, result, error FROM goals WHERE id = $1", goal_id
     )
     if goal is None:
         raise HTTPException(status_code=404, detail="goal not found")
@@ -78,6 +101,8 @@ async def get_goal(goal_id: UUID, request: Request):
         "prompt": goal["prompt"],
         "status": goal["status"],
         "plan_source": goal["plan_source"],
+        "result": json.loads(goal["result"]) if goal["result"] else None,
+        "error": goal["error"],
         "tasks": [
             {**dict(t), "id": str(t["id"]), "depends_on": [str(d) for d in t["depends_on"]]}
             for t in tasks
