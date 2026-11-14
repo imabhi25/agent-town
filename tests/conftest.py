@@ -7,6 +7,8 @@ import redis.asyncio as aioredis
 from app.config import settings
 from app.dispatcher import STREAM
 
+TRUNCATE_ALL = "TRUNCATE goals, tasks, jobs, job_outputs, outbox, events CASCADE"
+
 
 def _unavailable(reason: str):
     # In CI the services must exist, so a connection failure is a real failure there.
@@ -21,8 +23,10 @@ async def pool():
         p = await asyncpg.create_pool(settings.database_url, min_size=1, max_size=10)
     except (OSError, asyncpg.PostgresError) as e:
         _unavailable(f"Postgres not available: {e}")
-    await p.execute("TRUNCATE goals, tasks, jobs, job_outputs, outbox, events CASCADE")
+    await p.execute(TRUNCATE_ALL)
     yield p
+    # Clean up after the test too, so a finished run leaves no rows behind.
+    await p.execute(TRUNCATE_ALL)
     await p.close()
 
 
