@@ -18,6 +18,7 @@ class FailureMode(StrEnum):
     SUCCESS = "success"
     RATE_LIMIT = "429"
     SERVER_ERROR = "500"
+    BAD_REQUEST = "400"  # not retryable: goes straight to the DLQ
     TIMEOUT = "timeout"
 
 
@@ -63,6 +64,8 @@ class MockLLM:
             raise ProviderError(429, "mock provider error 429")
         if mode is FailureMode.SERVER_ERROR:
             raise ProviderError(500, "mock provider error 500")
+        if mode is FailureMode.BAD_REQUEST:
+            raise ProviderError(400, "mock provider error 400")
         if mode is FailureMode.TIMEOUT:
             raise TimeoutError("mock provider timed out")
         return {"text": f"[mock] result for: {prompt[:60]}"}
