@@ -5,7 +5,7 @@
 - [x] Day 2: schema; POST /goals stub and POST /jobs with Idempotency-Key (+ outbox row)
 - [x] Day 3: dispatcher moving outbox rows into a Redis Stream (tested against real Postgres + Redis)
 - [x] Day 4: worker pool (consumer group), mock LLM (latency, 429/500/timeouts)
-- [ ] Day 5: retries (exponential backoff + full jitter), max attempts, DLQ stream
+- [x] Day 5: retries (exponential backoff + full jitter), max attempts, DLQ stream
 - [ ] Day 6: XAUTOCLAIM recovery, heartbeats, transactional completion
 - [ ] Day 7: buffer. Done when a worker killed mid-job still completes the job once in effect.
 
@@ -19,6 +19,7 @@
 ## Week 3: visual and controls
 - [ ] React + TypeScript + PixiJS city map (queue, workers, DLQ, downstream)
 - [ ] Panels: event log, task checklist, throughput, p99, queue depth
+- [ ] Cap mock_latency and only accept mock_* fields from trusted input (payload fields can currently make a worker sleep arbitrarily long)
 - [ ] Chaos panel (kill worker, failure rate, flood with mock jobs), approval gate, DLQ replay, chat panel
 - [ ] Optional: isometric art with a free asset pack (+2-3 days)
 
