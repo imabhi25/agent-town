@@ -1,18 +1,28 @@
+import asyncio
 from contextlib import asynccontextmanager
 
 import asyncpg
+import redis.asyncio as aioredis
 from fastapi import FastAPI, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from app.config import settings
+from app.dispatcher import run_dispatcher
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.pool = await asyncpg.create_pool(settings.database_url, min_size=1, max_size=10)
+    app.state.redis = aioredis.from_url(settings.redis_url, decode_responses=True)
+    # For now the dispatcher runs inside the API process. It can move to its own process later.
+    stop = asyncio.Event()
+    dispatcher = asyncio.create_task(run_dispatcher(app.state.pool, app.state.redis, stop))
     try:
         yield
     finally:
+        stop.set()
+        await dispatcher
+        await app.state.redis.aclose()
         await app.state.pool.close()
 
 
