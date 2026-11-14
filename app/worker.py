@@ -221,9 +221,11 @@ async def handle_message(
     fields: dict,
     policy: RetryPolicy | None = None,
     after_complete: Callable[[UUID], Awaitable[None]] | None = None,
+    provider_timeout: float | None = None,
 ) -> None:
     """`after_complete` is a test hook awaited between the completion commit and the XACK."""
     policy = policy or RetryPolicy()
+    provider_timeout = settings.provider_timeout if provider_timeout is None else provider_timeout
     job_id = UUID(fields["job_id"])
 
     outcome, claim = await _claim(pool, redis, job_id, worker_id)
@@ -237,12 +239,20 @@ async def handle_message(
 
     payload = json.loads(fields.get("payload") or "{}")
     try:
-        output = await provider.complete(
-            payload.get("prompt", ""),
-            mode=payload.get("mock_mode"),
-            latency=payload.get("mock_latency"),
+        # wait_for cancels a hung call and raises TimeoutError, which is retryable (retry.py).
+        # Without it a hung call would hold the job locked forever (heartbeats only prove the
+        # process is alive).
+        output = await asyncio.wait_for(
+            provider.complete(
+                payload.get("prompt", ""),
+                mode=payload.get("mock_mode"),
+                latency=payload.get("mock_latency"),
+            ),
+            timeout=provider_timeout,
         )
     except (TimeoutError, ProviderError) as e:
+        if isinstance(e, TimeoutError) and not str(e):
+            e = TimeoutError(f"provider call exceeded {provider_timeout}s")  # wait_for's is blank
         # Only these two are caught. CancelledError is a BaseException and passes straight
         # through, so a killed worker never reaches an XACK.
         await _handle_error(pool, redis, policy, job_id, worker_id, claim, e)
@@ -304,6 +314,7 @@ async def worker_loop(
     policy: RetryPolicy | None = None,
     recovery: RecoveryConfig | None = None,
     after_complete: Callable[[UUID], Awaitable[None]] | None = None,
+    provider_timeout: float | None = None,
 ) -> None:
     recovery = recovery or RecoveryConfig()
     last_recovery = 0.0
@@ -318,14 +329,30 @@ async def worker_loop(
                     redis, STREAM, GROUP, worker_id, recovery.lease
                 ):
                     await handle_message(
-                        pool, redis, provider, worker_id, msg_id, fields, policy, after_complete
+                        pool,
+                        redis,
+                        provider,
+                        worker_id,
+                        msg_id,
+                        fields,
+                        policy,
+                        after_complete,
+                        provider_timeout,
                     )
 
             resp = await redis.xreadgroup(GROUP, worker_id, {STREAM: ">"}, count=1, block=block_ms)
             for _stream, entries in resp or []:
                 for msg_id, fields in entries:
                     await handle_message(
-                        pool, redis, provider, worker_id, msg_id, fields, policy, after_complete
+                        pool,
+                        redis,
+                        provider,
+                        worker_id,
+                        msg_id,
+                        fields,
+                        policy,
+                        after_complete,
+                        provider_timeout,
                     )
         except Exception:
             # Unexpected error: the message stays pending (no XACK) and is reclaimed after the lease.
@@ -345,7 +372,9 @@ class WorkerPool:
         mover_interval: float = 0.5,
         recovery: RecoveryConfig | None = None,
         after_complete: Callable[[UUID], Awaitable[None]] | None = None,
+        provider_timeout: float | None = None,
     ):
+        self.provider_timeout = provider_timeout
         self.pool, self.redis, self.provider = pool, redis, provider
         self.size, self.block_ms = size, block_ms
         self.policy = policy or RetryPolicy()
@@ -360,36 +389,40 @@ class WorkerPool:
     async def start(self) -> None:
         await ensure_group(self.redis)
         for i in range(1, self.size + 1):
-            wid = f"worker-{i}"
-            # Beat once BEFORE the worker can read a message, so it never looks dead at start.
-            await beat(self.redis, wid, self.recovery.heartbeat_ttl)
-            self.heartbeats[wid] = asyncio.create_task(
-                heartbeat_loop(
-                    self.redis,
-                    wid,
-                    self._stop,
-                    self.recovery.heartbeat_interval,
-                    self.recovery.heartbeat_ttl,
-                ),
-                name=f"{wid}-heartbeat",
-            )
-            self.tasks[wid] = asyncio.create_task(
-                worker_loop(
-                    wid,
-                    self.pool,
-                    self.redis,
-                    self.provider,
-                    self._stop,
-                    self.block_ms,
-                    self.policy,
-                    self.recovery,
-                    self.after_complete,
-                ),
-                name=wid,
-            )
+            await self.start_worker(f"worker-{i}")
         self.mover = asyncio.create_task(
             run_delayed_mover(self.pool, self.redis, self._stop, self.mover_interval),
             name="delayed-mover",
+        )
+
+    async def start_worker(self, wid: str) -> None:
+        """Start one worker with its heartbeat. Also used to replace a killed worker."""
+        # Beat once BEFORE the worker can read a message, so it never looks dead at start.
+        await beat(self.redis, wid, self.recovery.heartbeat_ttl)
+        self.heartbeats[wid] = asyncio.create_task(
+            heartbeat_loop(
+                self.redis,
+                wid,
+                self._stop,
+                self.recovery.heartbeat_interval,
+                self.recovery.heartbeat_ttl,
+            ),
+            name=f"{wid}-heartbeat",
+        )
+        self.tasks[wid] = asyncio.create_task(
+            worker_loop(
+                wid,
+                self.pool,
+                self.redis,
+                self.provider,
+                self._stop,
+                self.block_ms,
+                self.policy,
+                self.recovery,
+                self.after_complete,
+                self.provider_timeout,
+            ),
+            name=wid,
         )
 
     async def kill_worker(self, worker_id: str) -> None:
