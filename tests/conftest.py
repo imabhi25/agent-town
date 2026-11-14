@@ -15,7 +15,14 @@ TRUNCATE_ALL = "TRUNCATE goals, tasks, jobs, job_outputs, outbox, events CASCADE
 async def _clean_redis(r) -> None:
     await r.delete(STREAM, DLQ_STREAM, DELAYED_KEY, EVENTS_STREAM)
     # Heartbeat keys and the daily Gemini counters must not leak between tests.
-    for pattern in ("worker:hb:*", "gemini:calls:*"):
+    for pattern in (
+        "worker:hb:*",
+        "gemini:calls:*",
+        "ratelimit:*",
+        "circuit:*",
+        "goals:live:*",
+        "budget:redis:*",
+    ):
         keys = [k async for k in r.scan_iter(match=pattern)]
         if keys:
             await r.delete(*keys)
@@ -56,12 +63,32 @@ async def redis():
 
 
 @pytest.fixture
+async def counting_redis():
+    from app.redis_budget import CountingRedis
+
+    r = CountingRedis.from_url(settings.redis_url, decode_responses=True)
+    try:
+        await r.ping()
+    except OSError as e:
+        await r.aclose()
+        _unavailable(f"Redis not available: {e}")
+    await _clean_redis(r)
+    yield r
+    await _clean_redis(r)
+    await r.aclose()
+
+
+@pytest.fixture
 async def client(pool):
     import httpx
 
     from app.main import app
 
     app.state.pool = pool
+    # `app` is a module-level singleton: clear what an earlier test (or lifespan) attached.
+    for name in ("redis", "guard", "gate", "hub", "workers"):
+        if hasattr(app.state, name):
+            delattr(app.state, name)
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
         yield c

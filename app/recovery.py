@@ -33,9 +33,18 @@ async def is_alive(redis: Redis, worker_id: str) -> bool:
 
 
 async def heartbeat_loop(
-    redis: Redis, worker_id: str, stop: asyncio.Event, interval: float, ttl: float
+    redis: Redis,
+    worker_id: str,
+    stop: asyncio.Event,
+    interval: float,
+    ttl: float,
+    gate=None,
 ) -> None:
     while not stop.is_set():
+        if gate is not None:
+            await gate.wait_awake(stop)  # a sleeping worker does not beat; it beats on waking
+            if stop.is_set():
+                break
         try:
             await beat(redis, worker_id, ttl)
         except Exception:

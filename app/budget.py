@@ -18,8 +18,14 @@ def _today() -> str:
 
 
 class DailyCap:
-    def __init__(self, redis: Redis, limit: int, today: Callable[[], str] = _today):
-        self.redis, self.limit, self.today = redis, limit, today
+    def __init__(
+        self,
+        redis: Redis,
+        limit: int,
+        today: Callable[[], str] = _today,
+        prefix: str = KEY_PREFIX,
+    ):
+        self.redis, self.limit, self.today, self.prefix = redis, limit, today, prefix
 
     async def acquire(self) -> bool:
         """Reserve one call. INCR is atomic, so concurrent callers never exceed the limit.
@@ -27,7 +33,7 @@ class DailyCap:
         A refused call still increments the counter; that only makes it read slightly above the
         limit, which is harmless and avoids a second round trip.
         """
-        key = KEY_PREFIX + self.today()
+        key = self.prefix + self.today()
         used = await self.redis.incr(key)
         if used == 1:
             await self.redis.expire(key, TTL_SECONDS)

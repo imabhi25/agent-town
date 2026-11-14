@@ -51,10 +51,19 @@ async def publish_pending(pool: asyncpg.Pool, redis: Redis, batch_size: int = 10
 
 
 async def run_dispatcher(
-    pool: asyncpg.Pool, redis: Redis, stop: asyncio.Event, interval: float = 0.2
+    pool: asyncpg.Pool,
+    redis: Redis,
+    stop: asyncio.Event,
+    interval: float = 0.2,
+    gate=None,
 ) -> None:
-    """Poll the outbox until `stop` is set. Errors are logged and retried, never fatal."""
+    """Poll the outbox until `stop` is set. Errors are logged and retried, never fatal.
+    With a sleep gate (live demo) it does not poll while asleep."""
     while not stop.is_set():
+        if gate is not None:
+            await gate.wait_awake(stop)
+            if stop.is_set():
+                break
         try:
             published = await publish_pending(pool, redis)
         except Exception:
