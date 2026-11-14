@@ -24,7 +24,7 @@ from redis.exceptions import ResponseError
 from app.config import settings
 from app.dispatcher import STREAM
 from app.events import add_event
-from app.goals import store_plan
+from app.goals import complete_task, job_died, store_plan
 from app.planner import Planner, build_gemini_planner, make_plan
 from app.providers.mock_llm import MockLLM, ProviderError
 from app.recovery import RecoveryConfig, beat, claim_stale, heartbeat_key, heartbeat_loop, is_alive
@@ -176,7 +176,7 @@ async def _bury(
             """
             UPDATE jobs SET status = 'dead', completed_at = now(), updated_at = now()
             WHERE id = $1 AND status NOT IN ('succeeded', 'dead')
-            RETURNING type, payload
+            RETURNING type, payload, task_id
             """,
             job_id,
         )
@@ -193,6 +193,8 @@ async def _bury(
                 "reason": reason,
             },
         )
+        # A dead task or planner job fails its goal, in the same transaction.
+        await job_died(conn, row["type"], json.loads(row["payload"]), row["task_id"], error)
         await redis.xadd(
             DLQ_STREAM,
             {
@@ -278,6 +280,11 @@ async def handle_message(
                 ),
                 timeout=provider_timeout,
             )
+            if fields.get("type") == "task":
+                task_id = UUID(payload["task_id"])
+
+                async def on_success(conn: asyncpg.Connection) -> None:
+                    await complete_task(conn, task_id, output)
     except (TimeoutError, ProviderError) as e:
         if isinstance(e, TimeoutError) and not str(e):
             e = TimeoutError(f"provider call exceeded {provider_timeout}s")  # wait_for's is blank

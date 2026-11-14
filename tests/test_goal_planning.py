@@ -39,13 +39,15 @@ async def test_post_goal_queues_a_planner_job(client, pool):
 async def test_no_key_plan_is_stored_with_mock_source(client, pool, redis):
     goal_id = await _plan_goal(client, pool, redis, planner=None)
     goal = (await client.get(f"/goals/{goal_id}")).json()
-    assert goal["status"] == "planned" and goal["plan_source"] == "mock"
+    # After planning the goal starts: root tasks are queued (no dispatcher runs in this test).
+    assert goal["status"] == "running" and goal["plan_source"] == "mock"
     assert [t["key"] for t in goal["tasks"]] == ["t1", "t2", "t3", "t4"]
     by_key = {t["key"]: t for t in goal["tasks"]}
     # Planner ids were translated to real task UUIDs.
     assert by_key["t4"]["depends_on"] == [by_key["t2"]["id"], by_key["t3"]["id"]]
     assert by_key["t1"]["depends_on"] == []
-    assert by_key["t4"]["needs_approval"] and by_key["t1"]["status"] == "pending"
+    assert by_key["t4"]["needs_approval"]
+    assert by_key["t1"]["status"] == "queued" and by_key["t2"]["status"] == "pending"
 
     types = [r["type"] for r in await pool.fetch("SELECT type FROM events ORDER BY id")]
     assert types.count("goal.planned") == 1 and types.count("task.created") == 4

@@ -11,7 +11,7 @@
 
 ## Week 2: planner, dependencies, tests, events
 - [x] Gemini planner (JSON via response_schema, Pydantic validation, retry once, fallback plan)
-- [ ] Task dependencies: enqueue only when dependencies finish
+- [x] Task dependencies: enqueue only when dependencies finish
 - [ ] Events stream + WebSocket gateway (batched ~15 updates/sec)
 - [ ] Integration tests with testcontainers: kill-worker, crash between commit and XACK, duplicate submit, DLQ, retry
 - [ ] Synthetic load generator
