@@ -5,7 +5,8 @@ crash), so every step is guarded in Postgres and the message is XACKed only AFTE
 outcome is committed. See DECISIONS.md #1 and #5.
 
 Cancellation rule: nothing here catches CancelledError and no XACK sits in a `finally`. A killed
-worker therefore leaves its message unacknowledged (pending) for recovery on Day 6.
+worker therefore leaves its message unacknowledged (pending); another worker reclaims it with
+XAUTOCLAIM once the lease has expired and the dead worker's heartbeat is gone. See DECISIONS.md #7.
 """
 
 import asyncio
@@ -13,6 +14,7 @@ import contextlib
 import json
 import logging
 import time
+from collections.abc import Awaitable, Callable
 from uuid import UUID
 
 import asyncpg
@@ -23,6 +25,7 @@ from app.config import settings
 from app.dispatcher import STREAM
 from app.events import add_event
 from app.providers.mock_llm import MockLLM, ProviderError
+from app.recovery import RecoveryConfig, beat, claim_stale, heartbeat_key, heartbeat_loop, is_alive
 from app.retry import DELAYED_KEY, DLQ_STREAM, RetryPolicy, is_retryable
 
 GROUP = "workers"
@@ -40,12 +43,34 @@ async def ensure_group(redis: Redis) -> None:
             raise
 
 
-async def _claim(pool: asyncpg.Pool, job_id: UUID, worker_id: str) -> asyncpg.Record | None:
-    """Mark the job running for this worker. None if it already succeeded or died.
+async def _claim(
+    pool: asyncpg.Pool, redis: Redis, job_id: UUID, worker_id: str
+) -> tuple[str, asyncpg.Record | None]:
+    """Decide what to do with a delivered job, in ONE transaction holding the job's row lock.
 
-    Returns (attempts, max_attempts) so the caller knows whether a failure may be retried.
+    Returns (outcome, row):
+    - "finished": job is gone, succeeded or dead. Caller XACKs.
+    - "busy": job is running under ANOTHER worker that is still heartbeating. Caller leaves the
+      message pending (no XACK) and does not run the provider.
+    - "claimed": this worker now owns the job; row has (attempts, max_attempts).
+
+    FOR UPDATE makes two workers claiming the same job take turns: the second sees the first's
+    lock and finds its owner alive. If the previous owner is dead (no heartbeat), or the lock is
+    this worker's own (a worker handles one message at a time, so it cannot still be running it:
+    a restarted worker reusing its id), we take over and record job.recovered.
     """
     async with pool.acquire() as conn, conn.transaction():
+        job = await conn.fetchrow(
+            "SELECT status, locked_by FROM jobs WHERE id = $1 FOR UPDATE", job_id
+        )
+        if job is None or job["status"] in ("succeeded", "dead"):
+            return "finished", None
+
+        previous = job["locked_by"]
+        took_over = job["status"] == "running" and previous is not None
+        if took_over and previous != worker_id and await is_alive(redis, previous):
+            return "busy", None
+
         row = await conn.fetchrow(
             """
             UPDATE jobs
@@ -57,10 +82,14 @@ async def _claim(pool: asyncpg.Pool, job_id: UUID, worker_id: str) -> asyncpg.Re
             job_id,
             worker_id,
         )
-        if row is None:
-            return None
+        if took_over:
+            await add_event(
+                conn,
+                "job.recovered",
+                {"job_id": str(job_id), "previous_worker": previous, "new_worker": worker_id},
+            )
         await add_event(conn, "job.started", {"job_id": str(job_id), "worker": worker_id})
-        return row
+        return "claimed", row
 
 
 async def _complete(pool: asyncpg.Pool, job_id: UUID, worker_id: str, output: dict) -> None:
@@ -69,7 +98,7 @@ async def _complete(pool: asyncpg.Pool, job_id: UUID, worker_id: str, output: di
         updated = await conn.fetchval(
             """
             UPDATE jobs SET status = 'succeeded', completed_at = now(), updated_at = now()
-            WHERE id = $1 AND status != 'succeeded'
+            WHERE id = $1 AND status NOT IN ('succeeded', 'dead')
             RETURNING id
             """,
             job_id,
@@ -191,18 +220,19 @@ async def handle_message(
     msg_id: str,
     fields: dict,
     policy: RetryPolicy | None = None,
+    after_complete: Callable[[UUID], Awaitable[None]] | None = None,
 ) -> None:
+    """`after_complete` is a test hook awaited between the completion commit and the XACK."""
     policy = policy or RetryPolicy()
     job_id = UUID(fields["job_id"])
 
-    status = await pool.fetchval("SELECT status FROM jobs WHERE id = $1", job_id)
-    if status is None or status in ("succeeded", "dead"):
+    outcome, claim = await _claim(pool, redis, job_id, worker_id)
+    if outcome == "finished":
         await redis.xack(STREAM, GROUP, msg_id)
         return
-
-    claim = await _claim(pool, job_id, worker_id)
-    if claim is None:
-        await redis.xack(STREAM, GROUP, msg_id)
+    if outcome == "busy":
+        # Another live worker is running this job. Do NOT ack: if that worker dies, the message
+        # is still pending and gets reclaimed. If it finishes, the next claim sees 'succeeded'.
         return
 
     payload = json.loads(fields.get("payload") or "{}")
@@ -221,6 +251,8 @@ async def handle_message(
         return
 
     await _complete(pool, job_id, worker_id, output)
+    if after_complete is not None:
+        await after_complete(job_id)
     # Commit happened above; only now acknowledge. A crash right here means redelivery, which
     # the guarded UPDATE turns into a no-op.
     await redis.xack(STREAM, GROUP, msg_id)
@@ -270,15 +302,33 @@ async def worker_loop(
     stop: asyncio.Event,
     block_ms: int = 500,
     policy: RetryPolicy | None = None,
+    recovery: RecoveryConfig | None = None,
+    after_complete: Callable[[UUID], Awaitable[None]] | None = None,
 ) -> None:
+    recovery = recovery or RecoveryConfig()
+    last_recovery = 0.0
     while not stop.is_set():
         try:
+            # Recovery step: every `interval`, take over messages that have been pending longer
+            # than the lease (their worker died, or is still busy: _claim tells them apart).
+            # The claimed messages go to THIS worker, which is alive by definition.
+            if time.monotonic() - last_recovery >= recovery.interval:
+                last_recovery = time.monotonic()
+                for msg_id, fields in await claim_stale(
+                    redis, STREAM, GROUP, worker_id, recovery.lease
+                ):
+                    await handle_message(
+                        pool, redis, provider, worker_id, msg_id, fields, policy, after_complete
+                    )
+
             resp = await redis.xreadgroup(GROUP, worker_id, {STREAM: ">"}, count=1, block=block_ms)
             for _stream, entries in resp or []:
                 for msg_id, fields in entries:
-                    await handle_message(pool, redis, provider, worker_id, msg_id, fields, policy)
+                    await handle_message(
+                        pool, redis, provider, worker_id, msg_id, fields, policy, after_complete
+                    )
         except Exception:
-            # Unexpected error: the message stays pending (no XACK) and is recovered on Day 6.
+            # Unexpected error: the message stays pending (no XACK) and is reclaimed after the lease.
             log.exception("%s: cycle failed; continuing", worker_id)
             await asyncio.sleep(0.5)
 
@@ -293,11 +343,16 @@ class WorkerPool:
         block_ms: int = 500,
         policy: RetryPolicy | None = None,
         mover_interval: float = 0.5,
+        recovery: RecoveryConfig | None = None,
+        after_complete: Callable[[UUID], Awaitable[None]] | None = None,
     ):
         self.pool, self.redis, self.provider = pool, redis, provider
         self.size, self.block_ms = size, block_ms
         self.policy = policy or RetryPolicy()
         self.mover_interval = mover_interval
+        self.recovery = recovery or RecoveryConfig()
+        self.after_complete = after_complete
+        self.heartbeats: dict[str, asyncio.Task] = {}
         self.mover: asyncio.Task | None = None
         self.tasks: dict[str, asyncio.Task] = {}
         self._stop = asyncio.Event()
@@ -306,6 +361,18 @@ class WorkerPool:
         await ensure_group(self.redis)
         for i in range(1, self.size + 1):
             wid = f"worker-{i}"
+            # Beat once BEFORE the worker can read a message, so it never looks dead at start.
+            await beat(self.redis, wid, self.recovery.heartbeat_ttl)
+            self.heartbeats[wid] = asyncio.create_task(
+                heartbeat_loop(
+                    self.redis,
+                    wid,
+                    self._stop,
+                    self.recovery.heartbeat_interval,
+                    self.recovery.heartbeat_ttl,
+                ),
+                name=f"{wid}-heartbeat",
+            )
             self.tasks[wid] = asyncio.create_task(
                 worker_loop(
                     wid,
@@ -315,6 +382,8 @@ class WorkerPool:
                     self._stop,
                     self.block_ms,
                     self.policy,
+                    self.recovery,
+                    self.after_complete,
                 ),
                 name=wid,
             )
@@ -324,17 +393,26 @@ class WorkerPool:
         )
 
     async def kill_worker(self, worker_id: str) -> None:
-        """Simulate a crash: cancel the task mid-flight. Its message stays unacknowledged."""
-        task = self.tasks.pop(worker_id)
-        task.cancel()
-        await asyncio.gather(task, return_exceptions=True)
+        """Simulate a crash: cancel the worker AND its heartbeat. The message stays unacknowledged
+        and the heartbeat key is left to expire on its own, like a process that died."""
+        tasks = [self.tasks.pop(worker_id), self.heartbeats.pop(worker_id)]
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
 
     async def stop(self) -> None:
         """Graceful shutdown: workers finish their current message, then exit."""
         self._stop.set()
-        pending = list(self.tasks.values()) + ([self.mover] if self.mover else [])
+        pending = (
+            list(self.tasks.values())
+            + list(self.heartbeats.values())
+            + ([self.mover] if self.mover else [])
+        )
         await asyncio.gather(*pending, return_exceptions=True)
+        # A graceful shutdown deregisters; a crash is left to expire.
+        await self.redis.delete(*(heartbeat_key(w) for w in self.tasks))
         self.tasks.clear()
+        self.heartbeats.clear()
         self.mover = None
 
 

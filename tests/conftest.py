@@ -11,6 +11,13 @@ from app.retry import DELAYED_KEY, DLQ_STREAM
 TRUNCATE_ALL = "TRUNCATE goals, tasks, jobs, job_outputs, outbox, events CASCADE"
 
 
+async def _clean_redis(r) -> None:
+    await r.delete(STREAM, DLQ_STREAM, DELAYED_KEY)
+    keys = [k async for k in r.scan_iter(match="worker:hb:*")]
+    if keys:
+        await r.delete(*keys)
+
+
 def _unavailable(reason: str):
     # In CI the services must exist, so a connection failure is a real failure there.
     if os.environ.get("CI"):
@@ -39,9 +46,9 @@ async def redis():
     except OSError as e:
         await r.aclose()
         _unavailable(f"Redis not available: {e}")
-    await r.delete(STREAM, DLQ_STREAM, DELAYED_KEY)
+    await _clean_redis(r)
     yield r
-    await r.delete(STREAM, DLQ_STREAM, DELAYED_KEY)
+    await _clean_redis(r)
     await r.aclose()
 
 
