@@ -7,7 +7,7 @@
 - [x] Day 4: worker pool (consumer group), mock LLM (latency, 429/500/timeouts)
 - [x] Day 5: retries (exponential backoff + full jitter), max attempts, DLQ stream
 - [x] Day 6: XAUTOCLAIM recovery, heartbeats, transactional completion
-- [ ] Day 7: buffer. Done when a worker killed mid-job still completes the job once in effect.
+- [x] Day 7: buffer. Done when a worker killed mid-job still completes the job once in effect.
 
 ## Week 2: planner, dependencies, tests, events
 - [ ] Gemini planner (JSON via response_schema, Pydantic validation, retry once, fallback plan)
