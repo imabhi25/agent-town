@@ -1,3 +1,4 @@
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -20,6 +21,19 @@ class Settings(BaseSettings):
     # Mock provider latency range in seconds (overridable per job via payload `mock_latency`).
     mock_min_latency: float = 0.05
     mock_max_latency: float = 0.2
+    # Hard limit on one provider call. A hung call becomes a retryable TimeoutError.
+    provider_timeout: float = Field(default=30.0, gt=0)
+
+    @model_validator(mode="after")
+    def _heartbeat_shorter_than_lease(self) -> "Settings":
+        # If the heartbeat outlived the lease, a dead worker would still look alive when its
+        # message becomes claimable, and recovery would skip it. Fail at startup, not in a crash.
+        if self.heartbeat_ttl >= self.lease_seconds:
+            raise ValueError(
+                f"heartbeat_ttl ({self.heartbeat_ttl}) must be less than "
+                f"lease_seconds ({self.lease_seconds})"
+            )
+        return self
 
 
 settings = Settings()
