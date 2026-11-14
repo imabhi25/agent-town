@@ -1,4 +1,4 @@
-# Agent Town: instructions for Claude Code
+# Agent Town: development guide
 
 ## What this is
 Co-op portfolio project. A live city map driven by a real job engine: prompt -> Gemini planner -> task DAG -> Redis Streams workers -> events -> WebSocket -> map. The owner must be able to explain every part in interviews, so keep code simple and explain design choices.

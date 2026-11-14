@@ -1,11 +1,21 @@
 # Agent Town
 
-A live city map of a real distributed job engine. Type a goal, a Gemini planner breaks it into tasks, and workers ("agents") process them through Redis Streams with retries, a dead-letter queue, crash recovery and human approval gates. Every move on the map is a real event from the backend.
+A distributed job engine built with FastAPI, Redis Streams and PostgreSQL. Workers process jobs with retries, a dead-letter queue and crash recovery. A Gemini planner turns a goal into a validated task plan; dependency scheduling, approval endpoints and a WebSocket feed expose its execution state.
 
-> Status: week 1 (core engine) complete. See `PLAN.md`.
+> **In development:** the core engine, structured planner, dependency execution, approval endpoints and live event feed are implemented. The city-map interface and its visual controls are planned. See [the roadmap](PLAN.md).
+
+[![CI](https://github.com/imabhi25/agent-town/actions/workflows/ci.yml/badge.svg)](https://github.com/imabhi25/agent-town/actions/workflows/ci.yml)
+
+## Engineering focus
+
+- **Reliable submission:** an idempotency key prevents duplicate job creation; a transactional outbox bridges PostgreSQL and Redis.
+- **Failure handling:** retry backoff, dead-letter replay, worker heartbeats and pending-message recovery handle provider errors and worker crashes.
+- **Structured planning:** Pydantic validates model-generated plans; dependency execution and approval gates control when tasks can run.
+- **Live state:** transactional events flow through Redis to a batched WebSocket feed with bounded client queues.
+- **Inspectable tradeoffs:** [design decisions](DECISIONS.md), [recovery tests](tests/test_recovery.py), [event-stream tests](tests/test_events_stream.py) and [the chaos scenario](tests/test_chaos.py) explain the guarantees and their limits.
 
 ## Stack
-FastAPI + asyncio, Redis Streams, PostgreSQL, Gemini (`google-genai`), React + TypeScript + PixiJS (week 3), Docker Compose, pytest, GitHub Actions.
+**Implemented:** Python, FastAPI + asyncio, Redis Streams, PostgreSQL, Gemini (`google-genai`), Docker Compose, pytest and GitHub Actions. **Planned UI:** React + TypeScript + PixiJS.
 
 ## Run locally
 ```bash
