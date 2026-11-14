@@ -4,7 +4,6 @@ from contextlib import asynccontextmanager
 from uuid import UUID
 
 import asyncpg
-import redis.asyncio as aioredis
 from fastapi import FastAPI, Header, HTTPException, Request, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
 
@@ -13,26 +12,59 @@ from app.config import settings
 from app.dispatcher import run_dispatcher
 from app.event_publisher import run_event_publisher
 from app.hub import EventHub, build_snapshot
+from app.jobs import MockFieldRejected
+from app.jobs import create_job as insert_job
+from app.protection import GoalGuard
+from app.reconcile import reconcile
+from app.redis_budget import CommandBudget, CountingRedis
+from app.sleep import SleepGate, run_sleeper
+from app.worker import build_worker_pool
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.pool = await asyncpg.create_pool(settings.database_url, min_size=1, max_size=10)
-    app.state.redis = aioredis.from_url(settings.redis_url, decode_responses=True)
-    # For now the dispatcher runs inside the API process. It can move to its own process later.
+    app.state.redis = CountingRedis.from_url(settings.redis_url, decode_responses=True)
+    redis, pool = app.state.redis, app.state.pool
+
+    budget = CommandBudget(redis, settings.redis_monthly_limit, settings.redis_budget_guard_ratio)
+    await budget.flush()
+    gate = SleepGate(enabled=settings.live_demo, idle_seconds=settings.idle_sleep_seconds)
+    app.state.gate = gate
+    app.state.guard = GoalGuard(redis, budget, gate)
+    # Redis may have lost data while we were down: put back what Postgres still knows is pending.
+    await reconcile(pool, redis)
+
     stop = asyncio.Event()
-    dispatcher = asyncio.create_task(run_dispatcher(app.state.pool, app.state.redis, stop))
-    publisher = asyncio.create_task(run_event_publisher(app.state.pool, app.state.redis, stop))
-    app.state.hub = EventHub(app.state.redis)
+    poll = 0.5 if settings.live_demo else 0.2
+    background = [
+        asyncio.create_task(run_dispatcher(pool, redis, stop, poll, gate)),
+        asyncio.create_task(run_event_publisher(pool, redis, stop, poll / 4, gate)),
+        asyncio.create_task(budget.run(stop)),
+        asyncio.create_task(run_sleeper(gate, stop)),
+    ]
+    app.state.hub = EventHub(
+        redis,
+        block_ms=settings.worker_block_ms,
+        idle_mode=settings.live_demo,
+    )
     await app.state.hub.init()
     hub_task = asyncio.create_task(app.state.hub.run(stop))
+    workers = None
+    if settings.embedded_workers:
+        workers = build_worker_pool(pool, redis, gate)
+        app.state.workers = workers
+        await workers.start()
     try:
         yield
     finally:
         stop.set()
-        await asyncio.gather(dispatcher, publisher, hub_task, return_exceptions=True)
-        await app.state.redis.aclose()
-        await app.state.pool.close()
+        hub_task.cancel()  # may be blocked in XREAD
+        if workers is not None:
+            await workers.stop()
+        await asyncio.gather(*background, hub_task, return_exceptions=True)
+        await redis.aclose()
+        await pool.close()
 
 
 app = FastAPI(title="Agent Town", lifespan=lifespan)
@@ -53,6 +85,20 @@ async def health():
     return {"status": "ok"}
 
 
+@app.get("/healthz")
+async def healthz(request: Request):
+    """Liveness for hosting and for the frontend's wake-up poll. Deliberately touches neither
+    Postgres nor Redis (a free host may be cold, and this must answer fast and cost nothing).
+    `live` says whether live mode is open (false when the Redis command budget is nearly used)."""
+    guard = getattr(request.app.state, "guard", None)
+    gate = getattr(request.app.state, "gate", None)
+    return {
+        "status": "ok",
+        "live": True if guard is None else guard.live_available,
+        "sleeping": bool(gate and gate.sleeping),
+    }
+
+
 @app.get("/state")
 async def get_state(request: Request):
     """The same snapshot a WebSocket client receives on connect."""
@@ -64,6 +110,7 @@ async def ws_endpoint(websocket: WebSocket):
     """Snapshot first, then batched live events (see app/hub.py)."""
     await websocket.accept()
     state = websocket.app.state
+    await state.hub.ensure_active()
     client = state.hub.register(websocket.send_json, websocket.close)
     try:
         snapshot = await build_snapshot(state.pool, state.redis, up_to=client.join_id)
@@ -83,6 +130,12 @@ async def create_goal(body: GoalIn, request: Request):
 
     A worker plans it later; the tasks appear with goal.planned / task.created events.
     """
+    guard = getattr(request.app.state, "guard", None)
+    if guard is not None:
+        denial = await guard.check(request)
+        if denial is not None:
+            status, message, headers = denial
+            raise HTTPException(status_code=status, detail=message, headers=headers)
     pool: asyncpg.Pool = request.app.state.pool
     async with pool.acquire() as conn, conn.transaction():
         goal_id = await goals.create_goal(conn, body.prompt)
@@ -154,30 +207,16 @@ async def create_job(
         raise HTTPException(status_code=400, detail="Idempotency-Key header required")
 
     pool: asyncpg.Pool = request.app.state.pool
-    async with pool.acquire() as conn, conn.transaction():
-        row = await conn.fetchrow(
-            """
-            INSERT INTO jobs (type, payload, idempotency_key, max_attempts)
-            VALUES ($1, $2::jsonb, $3, $4)
-            ON CONFLICT (idempotency_key) DO NOTHING
-            RETURNING id
-            """,
-            body.type,
-            _json(body.payload),
-            idempotency_key,
-            body.max_attempts,
-        )
-        if row is None:
-            existing = await conn.fetchrow(
-                "SELECT id, status FROM jobs WHERE idempotency_key = $1", idempotency_key
+    try:
+        async with pool.acquire() as conn, conn.transaction():
+            created, existing = await insert_job(
+                conn, body.type, body.payload, idempotency_key, body.max_attempts
             )
-            return {"id": str(existing["id"]), "status": existing["status"], "duplicate": True}
-
-        await conn.execute("INSERT INTO outbox (job_id) VALUES ($1)", row["id"])
-        return {"id": str(row["id"]), "status": "queued", "duplicate": False}
-
-
-def _json(value: dict) -> str:
-    import json
-
-    return json.dumps(value)
+    except MockFieldRejected as e:
+        raise HTTPException(status_code=400, detail=str(e)) from None
+    if created is None:
+        return {"id": str(existing["id"]), "status": existing["status"], "duplicate": True}
+    guard = getattr(request.app.state, "guard", None)
+    if guard is not None:
+        guard.touch()
+    return {"id": str(created["id"]), "status": "queued", "duplicate": False}

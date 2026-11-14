@@ -9,16 +9,15 @@ from app.worker import GROUP
 
 
 async def _make_job(client, key: str, payload: dict | None = None, max_attempts: int = 5) -> str:
-    r = await client.post(
-        "/jobs",
-        json={
-            "type": "llm.mock",
-            "payload": payload or {"prompt": "hi"},
-            "max_attempts": max_attempts,
-        },
-        headers={"Idempotency-Key": key},
-    )
-    return r.json()["id"]
+    """Create a job as a trusted caller (mock_* fields allowed, like the chaos endpoints)."""
+    from app.jobs import create_job
+    from app.main import app
+
+    async with app.state.pool.acquire() as conn, conn.transaction():
+        created, _ = await create_job(
+            conn, "llm.mock", payload or {"prompt": "hi"}, key, max_attempts, trusted=True
+        )
+    return str(created["id"])
 
 
 async def _wait_for(check, timeout: float = 5.0):

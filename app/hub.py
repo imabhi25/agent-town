@@ -96,8 +96,15 @@ class EventHub:
         fps: int = MAX_FPS,
         send_timeout: float = 5.0,
         max_pending: int = MAX_PENDING,
+        block_ms: int = 500,
+        idle_mode: bool = False,
     ):
         self.redis = redis
+        self.block_ms = block_ms
+        # idle_mode (live demo): read the stream only while someone is connected.
+        self.idle_mode = idle_mode
+        self.idle = idle_mode
+        self._wake = asyncio.Event()
         self.min_interval = 1.0 / fps
         self.send_timeout, self.max_pending = send_timeout, max_pending
         self.clients: set[Client] = set()
@@ -107,6 +114,14 @@ class EventHub:
         """Start reading after the newest event; older ones reach clients via the snapshot."""
         latest = await self.redis.xrevrange(EVENTS_STREAM, count=1)
         self.last_id = latest[0][0] if latest else "0-0"
+
+    async def ensure_active(self) -> None:
+        """Call before register(). If the hub was idle (nobody connected) its position is stale,
+        so jump to the newest event; older ones reach the new client through the snapshot."""
+        if self.idle_mode and self.idle:
+            await self.init()
+            self.idle = False
+            self._wake.set()
 
     def register(
         self, send: Callable[[dict], Awaitable[None]], close: Callable[[], Awaitable[None]] | None
@@ -126,8 +141,19 @@ class EventHub:
 
     async def run(self, stop: asyncio.Event) -> None:
         while not stop.is_set():
+            if self.idle_mode and not self.clients:
+                self.idle = True
+                self._wake.clear()
+                waiters = [asyncio.create_task(self._wake.wait()), asyncio.create_task(stop.wait())]
+                await asyncio.wait(waiters, return_when=asyncio.FIRST_COMPLETED)
+                for w in waiters:
+                    w.cancel()
+                await asyncio.gather(*waiters, return_exceptions=True)
+                continue
             try:
-                resp = await self.redis.xread({EVENTS_STREAM: self.last_id}, count=500, block=500)
+                resp = await self.redis.xread(
+                    {EVENTS_STREAM: self.last_id}, count=500, block=self.block_ms
+                )
             except asyncio.CancelledError:
                 raise
             except Exception:

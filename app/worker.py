@@ -15,6 +15,7 @@ import json
 import logging
 import time
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from uuid import UUID
 
 import asyncpg
@@ -25,12 +26,26 @@ from app.config import settings
 from app.dispatcher import STREAM
 from app.events import add_event
 from app.goals import complete_task, job_died, store_plan
+from app.jobs import clamp_latency
 from app.planner import Planner, build_gemini_planner, make_plan
+from app.protection import Protection, deferral_delay
 from app.providers.mock_llm import MockLLM, ProviderError
 from app.recovery import RecoveryConfig, beat, claim_stale, heartbeat_key, heartbeat_loop, is_alive
 from app.retry import DELAYED_KEY, DLQ_STREAM, RetryPolicy, is_retryable
+from app.sleep import SleepGate
 
 GROUP = "workers"
+
+
+@dataclass
+class WorkerExtras:
+    """Optional collaborators of a worker; all None = the plain behaviour."""
+
+    planner: Planner | None = None  # real (Gemini) planner; None = mock planner only
+    protection: Protection | None = None  # circuit breaker + provider token bucket
+    gate: SleepGate | None = None  # free-tier live demo: sleep when idle
+    idle_backoff_max: float = 0.0  # seconds; 0 = no extra back-off when the queue is empty
+
 
 log = logging.getLogger("worker")
 
@@ -216,6 +231,7 @@ async def _handle_error(
     worker_id: str,
     claim: asyncpg.Record,
     error: Exception,
+    gate: SleepGate | None = None,
 ) -> None:
     attempts = claim["attempts"]
     if is_retryable(error) and attempts < claim["max_attempts"]:
@@ -223,6 +239,8 @@ async def _handle_error(
         if await _schedule_retry(pool, job_id, worker_id, attempts, delay, str(error)):
             # The delay lives in Redis, not in this worker: the worker is free right away.
             await redis.zadd(DELAYED_KEY, {str(job_id): time.time() + delay})
+            if gate is not None:
+                gate.delayed.set()  # wake the retry mover if it is idling
     else:
         reason = "max_attempts" if is_retryable(error) else "non_retryable"
         await _bury(pool, redis, job_id, worker_id, attempts, str(error), reason)
@@ -238,13 +256,30 @@ async def handle_message(
     policy: RetryPolicy | None = None,
     after_complete: Callable[[UUID], Awaitable[None]] | None = None,
     provider_timeout: float | None = None,
-    planner: Planner | None = None,
+    extras: WorkerExtras | None = None,
 ) -> None:
-    """`planner` is the real (Gemini) planner or None for mock-only; used for type 'planner' jobs.
+    """`extras.planner` is the real (Gemini) planner or None for mock-only (type 'planner' jobs).
     `after_complete` is a test hook awaited between the completion commit and the XACK."""
     policy = policy or RetryPolicy()
+    extras = extras or WorkerExtras()
+    planner, protection, gate = extras.planner, extras.protection, extras.gate
     provider_timeout = settings.provider_timeout if provider_timeout is None else provider_timeout
     job_id = UUID(fields["job_id"])
+
+    # Protect the provider BEFORE claiming: a refused job is parked, not failed, and does not
+    # burn an attempt (claiming increments `attempts`). If the circuit is open or we are calling
+    # too fast, the job returns via the delayed set once the wait has passed.
+    provider_name = "planner" if fields.get("type") == "planner" else "llm"
+    if protection is not None:
+        admission = await protection.admit(provider_name)
+        if not admission.ok:
+            await redis.zadd(
+                DELAYED_KEY, {str(job_id): time.time() + deferral_delay(admission.wait)}
+            )
+            if gate is not None:
+                gate.delayed.set()
+            await redis.xack(STREAM, GROUP, msg_id)
+            return
 
     outcome, claim = await _claim(pool, redis, job_id, worker_id)
     if outcome == "finished":
@@ -272,11 +307,19 @@ async def handle_message(
                 await store_plan(conn, goal_id, result.plan, result.source)
 
         else:
+            latency = payload.get("mock_latency")
+            extra = (
+                {"real": True}
+                if fields.get("type") == "task" and getattr(provider, "routes_real", False)
+                else {}
+            )
             output = await asyncio.wait_for(
                 provider.complete(
                     payload.get("prompt", ""),
                     mode=payload.get("mock_mode"),
-                    latency=payload.get("mock_latency"),
+                    # Defence in depth: whatever got into the payload, never sleep past 10s.
+                    latency=None if latency is None else clamp_latency(latency),
+                    **extra,
                 ),
                 timeout=provider_timeout,
             )
@@ -290,11 +333,17 @@ async def handle_message(
             e = TimeoutError(f"provider call exceeded {provider_timeout}s")  # wait_for's is blank
         # Only these two are caught. CancelledError is a BaseException and passes straight
         # through, so a killed worker never reaches an XACK.
-        await _handle_error(pool, redis, policy, job_id, worker_id, claim, e)
+        if protection is not None:
+            # A retryable error means the provider is unhealthy; a non-retryable one (400) means
+            # it answered fine and the request was bad, which counts as healthy.
+            await protection.record(provider_name, success=not is_retryable(e))
+        await _handle_error(pool, redis, policy, job_id, worker_id, claim, e, gate)
         # The outcome (retry scheduled in Redis, or dead + DLQ) is durable; now acknowledge.
         await redis.xack(STREAM, GROUP, msg_id)
         return
 
+    if protection is not None:
+        await protection.record(provider_name, success=True)
     await _complete(pool, job_id, worker_id, output, on_success)
     if after_complete is not None:
         await after_complete(job_id)
@@ -306,7 +355,8 @@ async def handle_message(
 async def move_due_jobs(
     pool: asyncpg.Pool, redis: Redis, now: float | None = None, batch: int = 100
 ) -> int:
-    """Move retries whose time has come from the delayed set back onto the stream.
+    """Move delayed jobs (retries, and jobs parked by the circuit breaker or rate limit) whose
+    time has come from the delayed set back onto the stream.
 
     XADD first, ZREM second: a crash in between re-delivers the job (a safe duplicate) instead of
     losing it. The job row is the source for the stream fields, so they cannot go stale.
@@ -318,7 +368,7 @@ async def move_due_jobs(
         row = await pool.fetchrow(
             "SELECT id, type, payload, status FROM jobs WHERE id = $1", UUID(job_id)
         )
-        if row is not None and row["status"] == "retrying":
+        if row is not None and row["status"] not in ("succeeded", "dead"):
             await redis.xadd(
                 STREAM, {"job_id": job_id, "type": row["type"], "payload": row["payload"]}
             )
@@ -328,11 +378,32 @@ async def move_due_jobs(
 
 
 async def run_delayed_mover(
-    pool: asyncpg.Pool, redis: Redis, stop: asyncio.Event, interval: float = 0.5
+    pool: asyncpg.Pool,
+    redis: Redis,
+    stop: asyncio.Event,
+    interval: float = 0.5,
+    gate: SleepGate | None = None,
 ) -> None:
+    """Poll the delayed set. With a live-demo gate the poll stops while nothing is delayed: the
+    loop waits for `gate.delayed` (set whenever a retry or park is scheduled) or 60s, whichever
+    comes first, so an idle system makes no Redis commands here."""
     while not stop.is_set():
+        if gate is not None:
+            await gate.wait_awake(stop)
         try:
             await move_due_jobs(pool, redis)
+            if gate is not None and gate.enabled:
+                gate.delayed.clear()  # clear BEFORE looking, so a concurrent zadd is not missed
+                if await redis.zcard(DELAYED_KEY) == 0:
+                    waiters = [
+                        asyncio.create_task(gate.delayed.wait()),
+                        asyncio.create_task(stop.wait()),
+                    ]
+                    await asyncio.wait(waiters, timeout=60, return_when=asyncio.FIRST_COMPLETED)
+                    for w in waiters:
+                        w.cancel()
+                    await asyncio.gather(*waiters, return_exceptions=True)
+                    continue
         except Exception:
             log.exception("delayed mover cycle failed; retrying")
         with contextlib.suppress(TimeoutError):
@@ -350,12 +421,19 @@ async def worker_loop(
     recovery: RecoveryConfig | None = None,
     after_complete: Callable[[UUID], Awaitable[None]] | None = None,
     provider_timeout: float | None = None,
-    planner: Planner | None = None,
+    extras: WorkerExtras | None = None,
 ) -> None:
     recovery = recovery or RecoveryConfig()
+    extras = extras or WorkerExtras()
+    gate = extras.gate
     last_recovery = 0.0
+    empty_reads = 0
     while not stop.is_set():
         try:
+            if gate is not None:
+                await gate.wait_awake(stop)  # asleep: no polling at all
+                if stop.is_set():
+                    break
             # Recovery step: every `interval`, take over messages that have been pending longer
             # than the lease (their worker died, or is still busy: _claim tells them apart).
             # The claimed messages go to THIS worker, which is alive by definition.
@@ -374,10 +452,21 @@ async def worker_loop(
                         policy,
                         after_complete,
                         provider_timeout,
-                        planner,
+                        extras,
                     )
 
             resp = await redis.xreadgroup(GROUP, worker_id, {STREAM: ">"}, count=1, block=block_ms)
+            if resp:
+                empty_reads = 0
+            elif extras.idle_backoff_max > 0:
+                # Idle back-off: the emptier the queue has been, the longer between reads (up to
+                # the max). A new goal cuts the sleep short through the gate.
+                empty_reads += 1
+                pause = min(extras.idle_backoff_max, 0.5 * 2**empty_reads)
+                if gate is not None:
+                    await gate.idle_sleep(pause)
+                else:
+                    await asyncio.sleep(pause)
             for _stream, entries in resp or []:
                 for msg_id, fields in entries:
                     await handle_message(
@@ -390,8 +479,16 @@ async def worker_loop(
                         policy,
                         after_complete,
                         provider_timeout,
-                        planner,
+                        extras,
                     )
+        except ResponseError as e:
+            if "NOGROUP" in str(e):
+                # Redis lost the stream or group (flush, eviction): recreate it and carry on.
+                log.warning("%s: consumer group missing; recreating", worker_id)
+                await ensure_group(redis)
+            else:
+                log.exception("%s: redis error; continuing", worker_id)
+                await asyncio.sleep(0.5)
         except Exception:
             # Unexpected error: the message stays pending (no XACK) and is reclaimed after the lease.
             log.exception("%s: cycle failed; continuing", worker_id)
@@ -412,9 +509,13 @@ class WorkerPool:
         after_complete: Callable[[UUID], Awaitable[None]] | None = None,
         provider_timeout: float | None = None,
         planner: Planner | None = None,
+        protection: Protection | None = None,
+        gate: SleepGate | None = None,
+        idle_backoff_max: float = 0.0,
     ):
         self.provider_timeout = provider_timeout
-        self.planner = planner
+        self.gate = gate
+        self.extras = WorkerExtras(planner, protection, gate, idle_backoff_max)
         self.pool, self.redis, self.provider = pool, redis, provider
         self.size, self.block_ms = size, block_ms
         self.policy = policy or RetryPolicy()
@@ -431,7 +532,7 @@ class WorkerPool:
         for i in range(1, self.size + 1):
             await self.start_worker(f"worker-{i}")
         self.mover = asyncio.create_task(
-            run_delayed_mover(self.pool, self.redis, self._stop, self.mover_interval),
+            run_delayed_mover(self.pool, self.redis, self._stop, self.mover_interval, self.gate),
             name="delayed-mover",
         )
 
@@ -446,6 +547,7 @@ class WorkerPool:
                 self._stop,
                 self.recovery.heartbeat_interval,
                 self.recovery.heartbeat_ttl,
+                self.gate,
             ),
             name=f"{wid}-heartbeat",
         )
@@ -461,7 +563,7 @@ class WorkerPool:
                 self.recovery,
                 self.after_complete,
                 self.provider_timeout,
-                self.planner,
+                self.extras,
             ),
             name=wid,
         )
@@ -490,18 +592,44 @@ class WorkerPool:
         self.mover = None
 
 
+def build_worker_pool(
+    pool: asyncpg.Pool, redis: Redis, gate: SleepGate | None = None
+) -> "WorkerPool":
+    """The production worker pool: real Gemini where configured (capped), circuit breaker and
+    provider rate limit on, and the live-demo profile's back-off when LIVE_DEMO is set."""
+    from app.providers.gemini_llm import build_provider
+
+    planner = build_gemini_planner(
+        redis, settings.gemini_api_key, settings.gemini_model, settings.gemini_daily_cap
+    )  # None without a key: the mock planner is used
+    provider = build_provider(
+        redis, settings.gemini_api_key, settings.gemini_model, settings.gemini_daily_cap
+    )
+    return WorkerPool(
+        pool,
+        redis,
+        provider,
+        size=settings.worker_count,
+        block_ms=settings.worker_block_ms,
+        planner=planner,
+        protection=Protection(pool, redis),
+        gate=gate,
+        idle_backoff_max=5.0 if settings.live_demo else 0.0,
+    )
+
+
 async def main() -> None:
     import asyncpg
-    from redis.asyncio import from_url
+
+    from app.reconcile import reconcile
+    from app.redis_budget import CountingRedis
 
     pool = await asyncpg.create_pool(
         settings.database_url, min_size=1, max_size=settings.worker_count + 2
     )
-    redis = from_url(settings.redis_url, decode_responses=True)
-    planner = build_gemini_planner(
-        redis, settings.gemini_api_key, settings.gemini_model, settings.gemini_daily_cap
-    )  # None without a key: the mock planner is used
-    workers = WorkerPool(pool, redis, MockLLM(), size=settings.worker_count, planner=planner)
+    redis = CountingRedis.from_url(settings.redis_url, decode_responses=True)
+    await reconcile(pool, redis)  # Redis may have lost jobs that Postgres still knows about
+    workers = build_worker_pool(pool, redis)
     await workers.start()
     try:
         await asyncio.Event().wait()

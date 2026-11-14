@@ -72,9 +72,13 @@ def parse_event(stream_id: str, fields: dict) -> dict:
 
 
 async def run_event_publisher(
-    pool: asyncpg.Pool, redis: Redis, stop: asyncio.Event, interval: float = 0.05
+    pool: asyncpg.Pool, redis: Redis, stop: asyncio.Event, interval: float = 0.05, gate=None
 ) -> None:
     while not stop.is_set():
+        if gate is not None:
+            await gate.wait_awake(stop)
+            if stop.is_set():
+                break
         try:
             published = await publish_events(pool, redis)
         except Exception:
