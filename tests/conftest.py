@@ -13,9 +13,11 @@ TRUNCATE_ALL = "TRUNCATE goals, tasks, jobs, job_outputs, outbox, events CASCADE
 
 async def _clean_redis(r) -> None:
     await r.delete(STREAM, DLQ_STREAM, DELAYED_KEY)
-    keys = [k async for k in r.scan_iter(match="worker:hb:*")]
-    if keys:
-        await r.delete(*keys)
+    # Heartbeat keys and the daily Gemini counters must not leak between tests.
+    for pattern in ("worker:hb:*", "gemini:calls:*"):
+        keys = [k async for k in r.scan_iter(match=pattern)]
+        if keys:
+            await r.delete(*keys)
 
 
 def _unavailable(reason: str):

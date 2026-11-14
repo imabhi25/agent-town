@@ -8,6 +8,8 @@ class Settings(BaseSettings):
     database_url: str = "postgresql://agent:agent@localhost:5432/agent_town"
     redis_url: str = "redis://localhost:6379/0"
     gemini_api_key: str = ""
+    gemini_model: str = "gemini-2.5-flash"
+    # Hard daily limit on real Gemini calls (counted in Redis). Over it, the mock planner is used.
     gemini_daily_cap: int = 50
     worker_count: int = 4
     # Retry backoff in seconds: delay = uniform(0, min(cap, base * 2**(attempt-1))).

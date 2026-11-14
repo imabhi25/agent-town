@@ -24,6 +24,8 @@ from redis.exceptions import ResponseError
 from app.config import settings
 from app.dispatcher import STREAM
 from app.events import add_event
+from app.goals import store_plan
+from app.planner import Planner, build_gemini_planner, make_plan
 from app.providers.mock_llm import MockLLM, ProviderError
 from app.recovery import RecoveryConfig, beat, claim_stale, heartbeat_key, heartbeat_loop, is_alive
 from app.retry import DELAYED_KEY, DLQ_STREAM, RetryPolicy, is_retryable
@@ -92,8 +94,18 @@ async def _claim(
         return "claimed", row
 
 
-async def _complete(pool: asyncpg.Pool, job_id: UUID, worker_id: str, output: dict) -> None:
-    """Record success in ONE transaction. If another delivery already won, write nothing."""
+async def _complete(
+    pool: asyncpg.Pool,
+    job_id: UUID,
+    worker_id: str,
+    output: dict,
+    on_success: Callable[[asyncpg.Connection], Awaitable[None]] | None = None,
+) -> None:
+    """Record success in ONE transaction. If another delivery already won, write nothing.
+
+    `on_success` runs inside the same transaction, and only for the delivery that wins the guarded
+    UPDATE, so side effects of completion (such as storing a plan) happen exactly once in effect.
+    """
     async with pool.acquire() as conn, conn.transaction():
         updated = await conn.fetchval(
             """
@@ -111,6 +123,8 @@ async def _complete(pool: asyncpg.Pool, job_id: UUID, worker_id: str, output: di
             json.dumps(output),
         )
         await add_event(conn, "job.succeeded", {"job_id": str(job_id), "worker": worker_id})
+        if on_success is not None:
+            await on_success(conn)
 
 
 async def _schedule_retry(
@@ -222,8 +236,10 @@ async def handle_message(
     policy: RetryPolicy | None = None,
     after_complete: Callable[[UUID], Awaitable[None]] | None = None,
     provider_timeout: float | None = None,
+    planner: Planner | None = None,
 ) -> None:
-    """`after_complete` is a test hook awaited between the completion commit and the XACK."""
+    """`planner` is the real (Gemini) planner or None for mock-only; used for type 'planner' jobs.
+    `after_complete` is a test hook awaited between the completion commit and the XACK."""
     policy = policy or RetryPolicy()
     provider_timeout = settings.provider_timeout if provider_timeout is None else provider_timeout
     job_id = UUID(fields["job_id"])
@@ -238,18 +254,30 @@ async def handle_message(
         return
 
     payload = json.loads(fields.get("payload") or "{}")
+    on_success = None
     try:
         # wait_for cancels a hung call and raises TimeoutError, which is retryable (retry.py).
         # Without it a hung call would hold the job locked forever (heartbeats only prove the
         # process is alive).
-        output = await asyncio.wait_for(
-            provider.complete(
-                payload.get("prompt", ""),
-                mode=payload.get("mock_mode"),
-                latency=payload.get("mock_latency"),
-            ),
-            timeout=provider_timeout,
-        )
+        if fields.get("type") == "planner":
+            result = await asyncio.wait_for(
+                make_plan(payload.get("prompt", ""), planner), timeout=provider_timeout
+            )
+            output = {"source": result.source, "tasks": [t.model_dump() for t in result.plan.tasks]}
+            goal_id = UUID(payload["goal_id"])
+
+            async def on_success(conn: asyncpg.Connection) -> None:
+                await store_plan(conn, goal_id, result.plan, result.source)
+
+        else:
+            output = await asyncio.wait_for(
+                provider.complete(
+                    payload.get("prompt", ""),
+                    mode=payload.get("mock_mode"),
+                    latency=payload.get("mock_latency"),
+                ),
+                timeout=provider_timeout,
+            )
     except (TimeoutError, ProviderError) as e:
         if isinstance(e, TimeoutError) and not str(e):
             e = TimeoutError(f"provider call exceeded {provider_timeout}s")  # wait_for's is blank
@@ -260,7 +288,7 @@ async def handle_message(
         await redis.xack(STREAM, GROUP, msg_id)
         return
 
-    await _complete(pool, job_id, worker_id, output)
+    await _complete(pool, job_id, worker_id, output, on_success)
     if after_complete is not None:
         await after_complete(job_id)
     # Commit happened above; only now acknowledge. A crash right here means redelivery, which
@@ -315,6 +343,7 @@ async def worker_loop(
     recovery: RecoveryConfig | None = None,
     after_complete: Callable[[UUID], Awaitable[None]] | None = None,
     provider_timeout: float | None = None,
+    planner: Planner | None = None,
 ) -> None:
     recovery = recovery or RecoveryConfig()
     last_recovery = 0.0
@@ -338,6 +367,7 @@ async def worker_loop(
                         policy,
                         after_complete,
                         provider_timeout,
+                        planner,
                     )
 
             resp = await redis.xreadgroup(GROUP, worker_id, {STREAM: ">"}, count=1, block=block_ms)
@@ -353,6 +383,7 @@ async def worker_loop(
                         policy,
                         after_complete,
                         provider_timeout,
+                        planner,
                     )
         except Exception:
             # Unexpected error: the message stays pending (no XACK) and is reclaimed after the lease.
@@ -373,8 +404,10 @@ class WorkerPool:
         recovery: RecoveryConfig | None = None,
         after_complete: Callable[[UUID], Awaitable[None]] | None = None,
         provider_timeout: float | None = None,
+        planner: Planner | None = None,
     ):
         self.provider_timeout = provider_timeout
+        self.planner = planner
         self.pool, self.redis, self.provider = pool, redis, provider
         self.size, self.block_ms = size, block_ms
         self.policy = policy or RetryPolicy()
@@ -421,6 +454,7 @@ class WorkerPool:
                 self.recovery,
                 self.after_complete,
                 self.provider_timeout,
+                self.planner,
             ),
             name=wid,
         )
@@ -457,7 +491,10 @@ async def main() -> None:
         settings.database_url, min_size=1, max_size=settings.worker_count + 2
     )
     redis = from_url(settings.redis_url, decode_responses=True)
-    workers = WorkerPool(pool, redis, MockLLM(), size=settings.worker_count)
+    planner = build_gemini_planner(
+        redis, settings.gemini_api_key, settings.gemini_model, settings.gemini_daily_cap
+    )  # None without a key: the mock planner is used
+    workers = WorkerPool(pool, redis, MockLLM(), size=settings.worker_count, planner=planner)
     await workers.start()
     try:
         await asyncio.Event().wait()
