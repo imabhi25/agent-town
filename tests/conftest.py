@@ -6,6 +6,7 @@ import redis.asyncio as aioredis
 
 from app.config import settings
 from app.dispatcher import STREAM
+from app.retry import DELAYED_KEY, DLQ_STREAM
 
 TRUNCATE_ALL = "TRUNCATE goals, tasks, jobs, job_outputs, outbox, events CASCADE"
 
@@ -38,9 +39,9 @@ async def redis():
     except OSError as e:
         await r.aclose()
         _unavailable(f"Redis not available: {e}")
-    await r.delete(STREAM)
+    await r.delete(STREAM, DLQ_STREAM, DELAYED_KEY)
     yield r
-    await r.delete(STREAM)
+    await r.delete(STREAM, DLQ_STREAM, DELAYED_KEY)
     await r.aclose()
 
 
