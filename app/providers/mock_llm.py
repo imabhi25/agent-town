@@ -20,6 +20,7 @@ class FailureMode(StrEnum):
     SERVER_ERROR = "500"
     BAD_REQUEST = "400"  # not retryable: goes straight to the DLQ
     TIMEOUT = "timeout"
+    HANG = "hang"  # never answers: only a caller-side timeout can end the call
 
 
 class ProviderError(Exception):
@@ -66,6 +67,8 @@ class MockLLM:
             raise ProviderError(500, "mock provider error 500")
         if mode is FailureMode.BAD_REQUEST:
             raise ProviderError(400, "mock provider error 400")
+        if mode is FailureMode.HANG:
+            await asyncio.sleep(3600)  # cancelled by the caller's asyncio.wait_for
         if mode is FailureMode.TIMEOUT:
             raise TimeoutError("mock provider timed out")
         return {"text": f"[mock] result for: {prompt[:60]}"}
