@@ -5,12 +5,14 @@ from uuid import UUID
 
 import asyncpg
 import redis.asyncio as aioredis
-from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi import FastAPI, Header, HTTPException, Request, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
 
 from app import goals
 from app.config import settings
 from app.dispatcher import run_dispatcher
+from app.event_publisher import run_event_publisher
+from app.hub import EventHub, build_snapshot
 
 
 @asynccontextmanager
@@ -20,11 +22,15 @@ async def lifespan(app: FastAPI):
     # For now the dispatcher runs inside the API process. It can move to its own process later.
     stop = asyncio.Event()
     dispatcher = asyncio.create_task(run_dispatcher(app.state.pool, app.state.redis, stop))
+    publisher = asyncio.create_task(run_event_publisher(app.state.pool, app.state.redis, stop))
+    app.state.hub = EventHub(app.state.redis)
+    await app.state.hub.init()
+    hub_task = asyncio.create_task(app.state.hub.run(stop))
     try:
         yield
     finally:
         stop.set()
-        await dispatcher
+        await asyncio.gather(dispatcher, publisher, hub_task, return_exceptions=True)
         await app.state.redis.aclose()
         await app.state.pool.close()
 
@@ -45,6 +51,30 @@ class JobIn(BaseModel):
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.get("/state")
+async def get_state(request: Request):
+    """The same snapshot a WebSocket client receives on connect."""
+    return await build_snapshot(request.app.state.pool, request.app.state.redis)
+
+
+@app.websocket("/ws")
+async def ws_endpoint(websocket: WebSocket):
+    """Snapshot first, then batched live events (see app/hub.py)."""
+    await websocket.accept()
+    state = websocket.app.state
+    client = state.hub.register(websocket.send_json, websocket.close)
+    try:
+        snapshot = await build_snapshot(state.pool, state.redis, up_to=client.join_id)
+        await websocket.send_json(snapshot)
+        client.start()
+        while True:  # we only listen for the disconnect; clients send nothing
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        pass
+    finally:
+        await state.hub.unregister(client)
 
 
 @app.post("/goals", status_code=201)
