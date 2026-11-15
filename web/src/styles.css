@@ -89,3 +89,19 @@ button.primary { background: var(--sage); }
   .approvals { position: static; max-width: none; margin-top: 8px; }
 }
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto; } }
+.pill { padding: 2px 10px; border-radius: 999px; font-size: 0.8rem; background: var(--apricot); }
+.pill.connected { background: var(--mint); }
+.pill.offline { background: var(--rose); }
+.modebar { display: flex; gap: 4px; }
+.modebar button { padding: 2px 12px; min-height: 30px; }
+button[aria-pressed="true"] { background: var(--lavender); border-color: var(--ink); }
+button:disabled { opacity: 0.55; cursor: not-allowed; }
+button:disabled:hover { background: #fff; }
+.off { margin-top: 4px; }
+.presets .row button { flex: 0 1 auto; }
+.playback progress { width: 120px; }
+.speeds { display: flex; gap: 4px; flex-direction: row; }
+.prompt { display: flex; flex-direction: column; gap: 8px; }
+.prompt input { font: inherit; padding: 6px 10px; border: 2px solid var(--line); border-radius: 10px; min-height: 36px; }
+.prompt input:disabled { background: #f0ebe3; }
+.panels.top { margin-top: 12px; align-items: start; }

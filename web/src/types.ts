@@ -27,3 +27,19 @@ export interface EventBatch {
 }
 
 export type ServerMessage = Snapshot | EventBatch;
+
+// A recorded trace (web/public/traces/*.json, written by scripts/record_trace.py).
+export interface Trace {
+  preset: string;
+  name: string;
+  description: string;
+  recorded_at: string;
+  snapshot: Snapshot; // the world before the first event
+  events: TownEvent[]; // exactly what /ws sends
+}
+
+export interface PresetInfo {
+  preset: string;
+  name: string;
+  description: string;
+}

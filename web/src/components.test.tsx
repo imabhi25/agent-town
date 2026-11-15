@@ -16,6 +16,7 @@ const fakeApi = (): Api & Record<keyof Api, ReturnType<typeof vi.fn>> =>
     replay: vi.fn().mockResolvedValue(ok),
     approve: vi.fn().mockResolvedValue(ok),
     reject: vi.fn().mockResolvedValue(ok),
+    submitGoal: vi.fn().mockResolvedValue(ok),
   }) as never;
 
 describe("ChaosPanel", () => {

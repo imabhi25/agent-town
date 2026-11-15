@@ -8,6 +8,7 @@ describe("createApi", () => {
   it("posts JSON to the right endpoints", async () => {
     const f = reply(200, {});
     const api = createApi("http://api", f);
+    await api.submitGoal("plan a trip");
     await api.killWorker("worker-2");
     await api.killWorker();
     await api.setFailureRate(0.3);
@@ -17,6 +18,7 @@ describe("createApi", () => {
     await api.reject("t2");
     const calls = f.mock.calls.map(([url, init]) => [url, init.method, init.body]);
     expect(calls).toEqual([
+      ["http://api/goals", "POST", '{"prompt":"plan a trip"}'],
       ["http://api/chaos/kill", "POST", '{"worker_id":"worker-2"}'],
       ["http://api/chaos/kill", "POST", "{}"],
       ["http://api/chaos/mock", "POST", '{"failure_rate":0.3}'],

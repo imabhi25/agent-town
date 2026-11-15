@@ -7,6 +7,7 @@ export interface ApiResult {
 }
 
 export interface Api {
+  submitGoal(prompt: string): Promise<ApiResult>;
   killWorker(workerId?: string): Promise<ApiResult>;
   startWorker(): Promise<ApiResult>;
   setFailureRate(rate: number): Promise<ApiResult>;
@@ -38,6 +39,7 @@ export function createApi(baseUrl: string, fetchFn: typeof fetch = fetch): Api {
     }
   }
   return {
+    submitGoal: (prompt) => post("/goals", { prompt }),
     killWorker: (id) => post("/chaos/kill", id ? { worker_id: id } : {}),
     startWorker: () => post("/chaos/start", {}),
     setFailureRate: (rate) => post("/chaos/mock", { failure_rate: rate }),

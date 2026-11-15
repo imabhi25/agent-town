@@ -2,42 +2,103 @@ import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { createApi } from "./api";
 import { CityMap } from "./CityMap";
 import { Connection } from "./connection";
+import { Controller } from "./controller";
+import { ModeBar, PresetPicker, PromptBox, StatusPill } from "./controls";
+import { HealthMonitor } from "./health";
+import { Replayer } from "./replay";
+import { TownStore } from "./townStore";
+import type { PresetInfo, Trace } from "./types";
 import "./styles.css";
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? "http://localhost:8000";
+const timers = {
+  setTimer: (fn: () => void, ms: number) => setTimeout(fn, ms),
+  clearTimer: (t: unknown) => clearTimeout(t as number),
+};
+
+async function getJson<T>(url: string, timeoutMs?: number): Promise<T> {
+  const r = await fetch(url, timeoutMs ? { signal: AbortSignal.timeout(timeoutMs) } : undefined);
+  if (!r.ok) throw new Error(String(r.status));
+  return r.json() as Promise<T>;
+}
 
 export function App() {
-  const conn = useMemo(
-    () =>
-      new Connection({
-        apiUrl: API_URL,
-        openSocket: (url) => new WebSocket(url) as never,
-        fetchJson: async (url) => {
-          const r = await fetch(url);
-          if (!r.ok) throw new Error(String(r.status));
-          return r.json();
-        },
-        setTimer: (fn, ms) => setTimeout(fn, ms),
-        clearTimer: (t) => clearTimeout(t as number),
-      }),
-    [],
-  );
   const api = useMemo(() => createApi(API_URL), []);
+  const ctl = useMemo(() => {
+    const store = new TownStore();
+    const health = new HealthMonitor({
+      ping: async () => {
+        // A sleeping free host can hang for a long time: give up on one ping after 10s.
+        const body = await getJson<{ status?: string; live?: boolean }>(`${API_URL}/healthz`, 10_000);
+        return { ok: body.status === "ok", live: body.live };
+      },
+      now: () => Date.now(),
+      ...timers,
+    });
+    return new Controller({
+      store,
+      health,
+      loadIndex: () => getJson<PresetInfo[]>("/traces/index.json"),
+      loadTrace: (id) => getJson<Trace>(`/traces/${encodeURIComponent(id)}.json`),
+      makeReplayer: (trace, sink, onChange) =>
+        new Replayer(trace, sink, { now: () => performance.now(), ...timers }, onChange),
+      makeConnection: (s) =>
+        new Connection(
+          {
+            apiUrl: API_URL,
+            openSocket: (url) => new WebSocket(url) as never,
+            fetchJson: (url) => getJson(url),
+            ...timers,
+          },
+          s,
+        ),
+      submitGoal: (prompt) => api.submitGoal(prompt),
+    });
+  }, [api]);
+
   useEffect(() => {
-    conn.start();
-    return () => conn.stop();
-  }, [conn]);
-  const view = useSyncExternalStore(conn.subscribe, conn.getView);
+    ctl.deps.health.start();
+    void ctl.init();
+    return () => ctl.dispose();
+  }, [ctl]);
+
+  const ui = useSyncExternalStore(ctl.subscribe, ctl.getUi);
+  const view = useSyncExternalStore(ctl.deps.store.subscribe, ctl.deps.store.getView);
+  const actions = {
+    selectPreset: (id: string) => void ctl.selectPreset(id),
+    goLive: () => ctl.goLive(),
+    goRecorded: () => void ctl.goRecorded(),
+    play: () => ctl.play(),
+    pause: () => ctl.pause(),
+    restart: () => ctl.restart(),
+    setSpeed: (s: number) => ctl.setSpeed(s),
+    submitPrompt: (t: string) => ctl.submitPrompt(t),
+  };
 
   return (
     <main>
       <header>
         <h1>Agent Town</h1>
-        <span className={`badge ${view.status}`} role="status">
-          {view.status === "open" ? "Connected" : view.status === "connecting" ? "Connecting…" : "Disconnected, retrying…"}
+        <StatusPill ui={ui} />
+        <ModeBar ui={ui} a={actions} />
+        <span className="muted" data-testid="mode">
+          {ui.mode === "live"
+            ? view.status === "open"
+              ? "Showing: live"
+              : "Showing: live (connecting…)"
+            : "Showing: recorded trace"}
         </span>
       </header>
-      <CityMap state={view} api={api} />
+      {ui.notice && (
+        <p className="notice" role="alert" data-testid="notice">
+          {ui.notice}
+        </p>
+      )}
+      <div className="panels top">
+        <PresetPicker ui={ui} a={actions} />
+        <PromptBox ui={ui} a={actions} />
+      </div>
+      <CityMap state={view} api={api} off={ui.liveOffReason} notify={(r) => ctl.report(r)} />
     </main>
   );
 }
