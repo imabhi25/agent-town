@@ -18,6 +18,9 @@ from redis.asyncio import Redis
 log = logging.getLogger("redis_budget")
 
 
+SOCKET_TIMEOUT = 30.0  # seconds; must exceed every BLOCK we use (5s in the live profile)
+
+
 class CountingRedis(Redis):
     command_count = 0
 
@@ -29,6 +32,14 @@ class CountingRedis(Redis):
 
         kwargs.setdefault("max_connections", 50)
         kwargs.setdefault("timeout", 10)
+        # redis-py 8 times a read out after 5s by default, which is exactly the live profile's
+        # XREADGROUP BLOCK of 5000ms: every idle worker poll failed ("Timeout reading").
+        # The socket timeout must be well above the longest blocking call.
+        kwargs.setdefault("socket_timeout", SOCKET_TIMEOUT)
+        kwargs.setdefault("socket_connect_timeout", 10)
+        # A hosted Redis (Upstash) closes idle connections: ping before reuse, keep TCP alive.
+        kwargs.setdefault("health_check_interval", 30)
+        kwargs.setdefault("socket_keepalive", True)
         return cls(connection_pool=BlockingConnectionPool.from_url(url, **kwargs))
 
     async def execute_command(self, *args, **options):

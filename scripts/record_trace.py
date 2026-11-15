@@ -24,13 +24,13 @@ from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
-import asyncpg
 import httpx
 from redis.asyncio import from_url
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.config import settings
+from app.db import create_pool
 from app.dispatcher import STREAM, run_dispatcher
 from app.event_publisher import EVENTS_STREAM, parse_event, run_event_publisher
 from app.hub import build_snapshot
@@ -276,7 +276,7 @@ async def record_once(pool, redis, preset: str, seed: int) -> Trace:
 
 
 async def main(args: argparse.Namespace) -> bool:
-    pool = await asyncpg.create_pool(settings.database_url, min_size=1, max_size=10)
+    pool = await create_pool(min_size=1, max_size=10)
     redis = from_url(settings.redis_url, decode_responses=True)
     try:
         if await pool.fetchval("SELECT count(*) FROM jobs") and not args.reset:

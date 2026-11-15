@@ -26,7 +26,7 @@
 - [ ] Optional: isometric art with a free asset pack (+2-3 days)
 
 ## Week 4: ship
-- [ ] Deploy (Fly.io or Railway + Vercel), replay fallback
+- [x] Deploy files and guide: Vercel + Render + Neon + Upstash, replay fallback (step 9; the manual account steps are in docs/DEPLOY.md)
 - [x] Daily caps in code (Gemini calls, live goals), per-IP limits, Redis command budget guard (step 4)
 - [ ] Link Google AI Pro Cloud credits; budget alert
 - [ ] k6 benchmark in README, architecture diagram, design notes, demo GIF, resume bullets

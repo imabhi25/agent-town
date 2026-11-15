@@ -1,0 +1,29 @@
+# Render Blueprint: one free web service running the whole backend (API + workers) in one process.
+# Secrets are NOT in this file: `sync: false` makes Render ask for them in the dashboard.
+services:
+  - type: web
+    name: agent-town-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /healthz      # answers without touching Postgres or Redis
+    autoDeploy: true
+    envVars:
+      - key: LIVE_DEMO
+        value: "true"              # embedded workers, quiet polling, caps, sleep when idle
+      - key: AUTO_MIGRATE
+        value: "true"              # Neon starts empty: apply migrations/*.sql at startup
+      - key: TRUST_FORWARDED_FOR
+        value: "true"              # Render's proxy sets X-Forwarded-For: per-IP limits need it
+      - key: DATABASE_URL
+        sync: false                # Neon direct connection string, with ?sslmode=require
+      - key: REDIS_URL
+        sync: false                # Upstash, rediss://... (TLS)
+      - key: CORS_ORIGINS
+        sync: false                # the Vercel origin, e.g. https://agent-town.vercel.app
+      - key: GEMINI_API_KEY
+        sync: false                # optional: empty = mock planner only
+      - key: GEMINI_DAILY_CAP
+        value: "50"
+      - key: LIVE_GOALS_DAILY_CAP
+        value: "30"

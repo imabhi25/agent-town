@@ -10,7 +10,8 @@ from pydantic import BaseModel, Field
 
 from app import goals
 from app.chaos_api import router as chaos_router
-from app.config import settings
+from app.config import production_problems, settings
+from app.db import create_pool
 from app.dispatcher import run_dispatcher
 from app.dlq import replay_dlq
 from app.event_publisher import run_event_publisher
@@ -19,6 +20,7 @@ from app.hub import EventHub, build_snapshot
 from app.jobs import MockFieldRejected
 from app.jobs import create_job as insert_job
 from app.loadgen import run_load_generator
+from app.migrate import migrate
 from app.protection import GoalGuard
 from app.reconcile import reconcile
 from app.redis_budget import CommandBudget, CountingRedis
@@ -29,7 +31,13 @@ from app.worker import build_worker_pool
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.state.pool = await asyncpg.create_pool(settings.database_url, min_size=1, max_size=10)
+    if settings.live_demo:
+        problems = production_problems(settings)
+        if problems:  # a bad deploy must fail loudly, not run half-open
+            raise RuntimeError("Unsafe live-demo configuration:\n- " + "\n- ".join(problems))
+    app.state.pool = await create_pool(min_size=1, max_size=10)
+    if settings.auto_migrate:
+        await migrate(app.state.pool)
     app.state.redis = CountingRedis.from_url(settings.redis_url, decode_responses=True)
     redis, pool = app.state.redis, app.state.pool
 
@@ -97,6 +105,16 @@ class JobIn(BaseModel):
     max_attempts: int = Field(default=5, ge=1, le=10)
 
 
+def _origin_allowed(origin: str | None) -> bool:
+    """CORS does not apply to WebSockets: any web page can open one. In the live demo only our own
+    site may (a browser always sends Origin). No Origin header means a non-browser client (curl,
+    tests), which is allowed: the Origin check protects against other SITES, not against scripts."""
+    if not settings.live_demo or origin is None:
+        return True
+    allowed = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
+    return origin in allowed
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}
@@ -130,6 +148,9 @@ async def get_state(request: Request):
 @app.websocket("/ws")
 async def ws_endpoint(websocket: WebSocket):
     """Snapshot first, then batched live events (see app/hub.py)."""
+    if not _origin_allowed(websocket.headers.get("origin")):
+        await websocket.close(code=1008)  # policy violation: not our site
+        return
     await websocket.accept()
     state = websocket.app.state
     await state.hub.ensure_active()
