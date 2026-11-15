@@ -12,4 +12,5 @@
 | 6. Web scaffold and frontend event store | [#10](https://github.com/imabhi25/agent-town/pull/10) | pass | 152 py, 19 js | Dedupe, ordering, gap/reconnect refetch |
 | 7. PixiJS city map, chaos panel, DLQ replay, approvals | [#11](https://github.com/imabhi25/agent-town/pull/11) | pass | 152 py, 55 js, 9 e2e | Event-driven scene, DOM controls |
 | 8. Recorded presets and live mode | [#12](https://github.com/imabhi25/agent-town/pull/12) | pass | 163 py, 103 js, 19 e2e | Traces recorded from the real engine, replay, /healthz ping |
-| 9. Free deployment files and guide | pending | pending | see PR | Dockerfile, render.yaml, vercel.json, migrations at startup, CORS lock, secret scan |
+| 9. Free deployment files and guide | [#13](https://github.com/imabhi25/agent-town/pull/13) | pass | 204 py, 103 js, 19 e2e | Dockerfile, render.yaml, vercel.json, migrations at startup, CORS lock, secret scan |
+| 10. Benchmark, README, interview notes | pending | pending | 204 py, 103 js, 19 e2e | k6 vs local stack, docs/benchmarks.md, docs/INTERVIEW.md |
