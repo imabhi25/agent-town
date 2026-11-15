@@ -39,7 +39,7 @@ POST /jobs ──▶ Postgres: jobs + outbox row (ONE transaction)
 4. **Retries and DLQ.** Retryable errors wait in a Redis sorted set (exponential backoff with full jitter), so a delay never holds a worker. After `max_attempts`, or on a non-retryable error, the job is marked `dead` and added to the `dlq` stream. `replay_dlq` re-enqueues it through the outbox.
 5. **Recovery.** Every worker has a heartbeat key with a TTL. A message pending longer than the lease is taken over with `XAUTOCLAIM`, and the job is run again only if its previous owner has no heartbeat. Settings are validated at startup: `heartbeat_ttl` must be less than `lease_seconds`.
 
-Design reasoning for every step is in `DECISIONS.md`.
+Design reasoning for every step is in `DECISIONS.md`. Free-tier deployment (Vercel + Render + Neon + Upstash) is in `docs/DEPLOY.md`.
 
 ## Delivery guarantee
 Redis Streams redelivers unacknowledged messages (XAUTOCLAIM), so a job can run more than once. The external call (LLM) has no side effects in our system, so repeating it is safe. Completion is one Postgres transaction: update the job `WHERE status != 'succeeded'`, insert the output (unique on job_id), check the affected row count, commit, then XACK. A crash between commit and XACK causes redelivery, the guarded update matches nothing, and nothing is duplicated. Result: effectively-once. We never claim exactly-once delivery.
