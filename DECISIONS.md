@@ -139,3 +139,19 @@ The row lock makes two workers claiming at once take turns, so the second always
 **`GET /stats`.** From Postgres plus the worker heartbeats: `throughput_per_sec` (succeeded jobs in the last 60s / 60), totals for `succeeded`, `retries` (count of `job.retry_scheduled` events: a takeover after a crash is not counted as a retry) and `dead`, `queue_depth` (queued + retrying), `running`, `active_workers`, and `latency_ms` p50/p95/p99. Latency is end to end (creation to completion, so it includes queueing, retries and backoff) for jobs that succeeded in the last 5 minutes, using `percentile_cont` (linear interpolation: for 100..1000 ms the p95 is 955). The same object is in every WebSocket snapshot and `/state`. It is computed on demand with a few indexed queries (migration 007), not cached; fine for a demo, and a cost to revisit if many clients poll.
 
 **Found by the tests.** `WorkerPool.stop()` crashed (`DEL` with no keys) after every worker had been killed. The new `events(type)` index also changed the row order of an unordered query in a step 4 test, which now has `ORDER BY id`.
+
+## Step 6: frontend event store
+
+**A pure reducer, with the network injected.** `web/src/store.ts` is `(state, message) -> (state, needSnapshot)`: no sockets, timers or React, so each rule is a plain unit test. `web/src/connection.ts` owns the WebSocket, reconnect backoff (1s doubling to 10s) and the `/state` fetch, with the socket, fetch and timers passed in so tests use fakes.
+
+**Dedupe by event id.** The stream is at-least-once and a snapshot can overlap the live feed, so the same event can arrive twice. The Postgres id is the key.
+
+**Order by (created_at, id), not arrival.** Events from two transactions that commit in the opposite order of their ids are published in commit order (see `event_publisher.py`), so arrival order is not time order. Time first, id as tie-break (timestamps are compared at millisecond precision, so same-millisecond events fall back to id).
+
+**Gap detection uses the server's `dropped` count, not id holes.** Postgres sequence ids skip numbers when a transaction rolls back, so "id jumped" would give false alarms. The hub already tells a client when it dropped events for it; that, and a new connection, are the cases where we know we missed something. On `dropped` the client fetches `GET /state` (one request at a time; gaps during a fetch are covered by it). On reconnect it relies on the snapshot the server pushes first on every new socket, instead of asking twice.
+
+**Snapshots merge their events, they do not replace the log.** A `/state` reply can land after newer live events; replacing would lose them. Overlap is dropped by id. The log is capped at 500 events and the seen-id set is rebuilt from it, so memory is bounded.
+
+**CORS.** The `/state` refetch is a cross-origin fetch from the dev server (WebSockets are not subject to CORS). `CORS_ORIGINS` (default `http://localhost:5173`) lists the allowed origins; Step 9 sets it to the Vercel origin.
+
+**Not in this step:** the PixiJS map, panels, and deriving goal/task state from events (the debug view shows the snapshot as of the last fetch; events only feed the log).

@@ -17,6 +17,7 @@
 - [x] Synthetic load generator
 
 ## Week 3: visual and controls
+- [x] Vite + React + TS scaffold and event store (dedupe, order, gap/reconnect refetch) in web/ (step 6)
 - [ ] React + TypeScript + PixiJS city map (queue, workers, DLQ, downstream)
 - [ ] Panels: event log, task checklist, throughput, p99, queue depth
 - [x] Cap mock_latency and only accept mock_* fields from trusted input (payload fields can currently make a worker sleep arbitrarily long)

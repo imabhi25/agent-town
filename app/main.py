@@ -5,6 +5,7 @@ from uuid import UUID
 
 import asyncpg
 from fastapi import FastAPI, Header, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from app import goals
@@ -75,6 +76,12 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Agent Town", lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[o.strip() for o in settings.cors_origins.split(",") if o.strip()],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type", "Idempotency-Key"],
+)
 app.include_router(chaos_router)
 
 

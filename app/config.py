@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     # Per-IP token bucket on POST /goals: burst, then refill per second.
     goal_rate_capacity: float = 5
     goal_rate_per_sec: float = 0.1
+    # Browser origins allowed to call the API (comma separated). Step 9 sets it to the Vercel URL.
+    cors_origins: str = "http://localhost:5173"
     trust_forwarded_for: bool = False  # True behind a proxy that sets X-Forwarded-For (Render)
     live_goals_daily_cap: int = 30  # goals per UTC day across everyone; 0 = unlimited
     # Downstream token bucket for provider calls (per provider name).
