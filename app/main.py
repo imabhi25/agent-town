@@ -12,7 +12,9 @@ from app import goals
 from app.chaos_api import router as chaos_router
 from app.config import settings
 from app.dispatcher import run_dispatcher
+from app.dlq import replay_dlq
 from app.event_publisher import run_event_publisher
+from app.events import add_event
 from app.hub import EventHub, build_snapshot
 from app.jobs import MockFieldRejected
 from app.jobs import create_job as insert_job
@@ -162,6 +164,20 @@ async def create_goal(body: GoalIn, request: Request):
     return {"id": str(goal_id), "status": "planning"}
 
 
+@app.post("/dlq/{job_id}/replay")
+async def replay_dead_job(job_id: UUID, request: Request):
+    """Give a dead job a fresh retry budget and queue it again (see app/dlq.py)."""
+    guard = getattr(request.app.state, "guard", None)
+    if guard is not None:  # public in the demo, so it shares the chaos per-IP limit
+        denial = await guard.check_chaos(request)
+        if denial is not None:
+            status, message, headers = denial
+            raise HTTPException(status_code=status, detail=message, headers=headers)
+    if not await replay_dlq(request.app.state.pool, request.app.state.redis, job_id):
+        raise HTTPException(status_code=409, detail="job is not dead, nothing to replay")
+    return {"id": str(job_id), "status": "queued"}
+
+
 @app.post("/tasks/{task_id}/approve")
 async def approve_task(task_id: UUID, request: Request):
     return await _decide(request, task_id, goals.approve_task, "approved")
@@ -232,6 +248,8 @@ async def create_job(
             created, existing = await insert_job(
                 conn, body.type, body.payload, idempotency_key, body.max_attempts
             )
+            if created is not None:  # the map counts queue depth from events
+                await add_event(conn, "job.created", {"job_id": str(created["id"])})
     except MockFieldRejected as e:
         raise HTTPException(status_code=400, detail=str(e)) from None
     if created is None:

@@ -1,6 +1,8 @@
-// Debug view only: proves the store works against the live backend. The city map is a later step.
 import { useEffect, useMemo, useSyncExternalStore } from "react";
+import { createApi } from "./api";
+import { CityMap } from "./CityMap";
 import { Connection } from "./connection";
+import "./styles.css";
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? "http://localhost:8000";
 
@@ -20,38 +22,22 @@ export function App() {
       }),
     [],
   );
+  const api = useMemo(() => createApi(API_URL), []);
   useEffect(() => {
     conn.start();
     return () => conn.stop();
   }, [conn]);
-  const state = useSyncExternalStore(conn.subscribe, conn.getView);
-  const snap = state.snapshot;
+  const view = useSyncExternalStore(conn.subscribe, conn.getView);
 
   return (
-    <main style={{ fontFamily: "system-ui", padding: 16, maxWidth: 900, margin: "0 auto" }}>
-      <h1>Agent Town (debug view)</h1>
-      <p role="status">
-        Connection: <strong>{state.status}</strong> · events: {state.events.length} · gaps:{" "}
-        {state.gaps}
-      </p>
-      {snap ? (
-        <p>
-          Workers: {snap.workers.length} · queue depth: {snap.queue.depth} · goals:{" "}
-          {snap.goals.length}
-        </p>
-      ) : (
-        <p>Waiting for the first snapshot…</p>
-      )}
-      <ol style={{ fontFamily: "monospace", fontSize: 13, paddingLeft: 24 }}>
-        {state.events
-          .slice(-50)
-          .reverse()
-          .map((e) => (
-            <li key={e.id}>
-              {e.ts.slice(11, 23)} #{e.id} {e.type}
-            </li>
-          ))}
-      </ol>
+    <main>
+      <header>
+        <h1>Agent Town</h1>
+        <span className={`badge ${view.status}`} role="status">
+          {view.status === "open" ? "Connected" : view.status === "connecting" ? "Connecting…" : "Disconnected, retrying…"}
+        </span>
+      </header>
+      <CityMap state={view} api={api} />
     </main>
   );
 }

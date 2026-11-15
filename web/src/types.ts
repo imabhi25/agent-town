@@ -15,6 +15,7 @@ export interface Snapshot {
   workers: { id: string; job_id: string | null }[];
   queue: Record<string, number>;
   stats: Record<string, unknown>;
+  dead_jobs?: { job_id: string; type: string }[];
   events: TownEvent[];
   last_event_id: string;
 }
