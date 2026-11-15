@@ -48,6 +48,13 @@ class Settings(BaseSettings):
     chaos_rate_per_sec: float = 1.0
     load_generator: bool = False  # keeps a local system lightly busy; always OFF in the live demo
     load_interval: float = 2.0  # seconds between load generator ticks
+    # --- deployment (step 9) ---
+    # Apply migrations/*.sql at startup (a managed database starts empty). Off locally, where
+    # docker compose loads them.
+    auto_migrate: bool = False
+    # Neon's "-pooler" host is PgBouncer in transaction mode, which cannot keep prepared
+    # statements. Auto-detected from the host name; set true to force it for another pooler.
+    db_pooler: bool = False
     # --- live demo profile (free-tier hosting) ---
     live_demo: bool = False
     embedded_workers: bool = False  # run dispatcher + workers inside the API process
@@ -82,3 +89,32 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+LOCAL_ORIGIN_HINTS = ("localhost", "127.0.0.1", "[::1]")
+
+
+def production_problems(s: Settings) -> list[str]:
+    """Things that must be right before the public demo starts. Empty = fine. Checked at startup
+    when LIVE_DEMO is on, so a bad deploy fails loudly instead of running half-open."""
+    problems = []
+    origins = [o.strip() for o in s.cors_origins.split(",") if o.strip()]
+    if not origins:
+        problems.append("CORS_ORIGINS is empty: set it to the Vercel site's origin.")
+    for o in origins:
+        if o == "*":
+            problems.append("CORS_ORIGINS must not be '*': list the Vercel origin only.")
+        elif not o.startswith("https://"):
+            problems.append(
+                f"CORS_ORIGINS entry {o!r} must be an https:// origin in the live demo."
+            )
+        elif any(h in o for h in LOCAL_ORIGIN_HINTS):
+            problems.append(f"CORS_ORIGINS entry {o!r} points at localhost.")
+        elif o.endswith("/"):
+            problems.append(f"CORS_ORIGINS entry {o!r} must have no trailing slash.")
+    if not s.trust_forwarded_for:
+        problems.append(
+            "TRUST_FORWARDED_FOR must be true behind Render's proxy, or every visitor shares one "
+            "per-IP rate limit."
+        )
+    return problems

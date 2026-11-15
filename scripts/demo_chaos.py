@@ -14,11 +14,11 @@ import asyncio
 import subprocess
 import sys
 
-import asyncpg
 from redis.asyncio import from_url
 
 from app.chaos import ChaosResult, run_chaos
 from app.config import settings
+from app.db import create_pool
 from app.dispatcher import STREAM
 from app.retry import DELAYED_KEY, DLQ_STREAM
 
@@ -52,7 +52,7 @@ def summary(r: ChaosResult) -> str:
 
 
 async def main(args: argparse.Namespace) -> bool:
-    pool = await asyncpg.create_pool(settings.database_url, min_size=1, max_size=10)
+    pool = await create_pool(min_size=1, max_size=10)
     redis = from_url(settings.redis_url, decode_responses=True)
     try:
         if await pool.fetchval("SELECT count(*) FROM jobs") and not args.reset:

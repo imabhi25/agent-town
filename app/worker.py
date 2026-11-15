@@ -629,14 +629,11 @@ def build_worker_pool(
 
 
 async def main() -> None:
-    import asyncpg
-
+    from app.db import create_pool
     from app.reconcile import reconcile
     from app.redis_budget import CountingRedis
 
-    pool = await asyncpg.create_pool(
-        settings.database_url, min_size=1, max_size=settings.worker_count + 2
-    )
+    pool = await create_pool(min_size=1, max_size=settings.worker_count + 2)
     redis = CountingRedis.from_url(settings.redis_url, decode_responses=True)
     await reconcile(pool, redis)  # Redis may have lost jobs that Postgres still knows about
     workers = build_worker_pool(pool, redis)
