@@ -16,25 +16,29 @@ from app.migrate import MIGRATIONS, UnmanagedDatabase, migrate
 
 
 def test_direct_host_keeps_prepared_statements():
-    kw = pool_kwargs("postgresql://u:p@ep-cool-123.eu-central-1.aws.neon.tech/db?sslmode=require")
+    kw = pool_kwargs(
+        "postgresql://USER:PASSWORD@ep-cool-123.eu-central-1.aws.neon.tech/db?sslmode=require"
+    )
     assert "statement_cache_size" not in kw
 
 
 def test_pooler_host_turns_the_statement_cache_off():
-    url = "postgresql://u:p@ep-cool-123-pooler.eu-central-1.aws.neon.tech/db?sslmode=require"
+    url = "postgresql://USER:PASSWORD@ep-cool-123-pooler.eu-central-1.aws.neon.tech/db?sslmode=require"
     assert is_pooled(url)
     assert pool_kwargs(url)["statement_cache_size"] == 0
 
 
 def test_a_pooler_can_be_forced_for_other_providers():
     assert (
-        pool_kwargs("postgresql://u:p@db.example.com/x", forced_pooler=True)["statement_cache_size"]
+        pool_kwargs("postgresql://USER:PASSWORD@db.example.com/x", forced_pooler=True)[
+            "statement_cache_size"
+        ]
         == 0
     )
 
 
 def test_idle_connections_are_dropped_quickly_so_a_sleeping_database_is_not_a_problem():
-    assert pool_kwargs("postgresql://u:p@h/db")["max_inactive_connection_lifetime"] <= 60
+    assert pool_kwargs("postgresql://USER:PASSWORD@h/db")["max_inactive_connection_lifetime"] <= 60
 
 
 # ---- migrations ----
