@@ -8,4 +8,7 @@
 | 2. Run a goal end to end | [#5](https://github.com/imabhi25/agent-town/pull/5) | pass | 85 | Dependencies, approvals, goal failure |
 | 3. Live events and WebSocket | [#6](https://github.com/imabhi25/agent-town/pull/6) | pass | 97 | Events outbox -> stream, hub, /ws, /state |
 | 4. Protection, limits, free-tier budget (+ /healthz) | [#8](https://github.com/imabhi25/agent-town/pull/8) | pass | 131 | Lua bucket, breaker, live profile, reconcile |
-| 5. Chaos API, load generator, stats | pending | pending | 147 | /chaos/*, /stats, load generator |
+| 5. Chaos API, load generator, stats | [#9](https://github.com/imabhi25/agent-town/pull/9) | pass | 147 | /chaos/*, /stats, load generator |
+| 6. Web scaffold and frontend event store | [#10](https://github.com/imabhi25/agent-town/pull/10) | pass | 152 py, 19 js | Dedupe, ordering, gap/reconnect refetch |
+| 7. PixiJS city map, chaos panel, DLQ replay, approvals | [#11](https://github.com/imabhi25/agent-town/pull/11) | pass | 152 py, 55 js, 9 e2e | Event-driven scene, DOM controls |
+| 8. Recorded presets and live mode | pending | pending | 163 py, 103 js, 19 e2e | Traces recorded from the real engine, replay, /healthz ping |

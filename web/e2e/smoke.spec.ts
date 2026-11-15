@@ -35,6 +35,8 @@ async function openTown(page: Page, snap = snapshot()): Promise<Server> {
     });
   });
   await page.route("**/state", (r) => r.fulfill({ json: snap }));
+  // The page starts on a recording and pings /healthz; answering it is what flips it to live.
+  await page.route("**/healthz", (r) => r.fulfill({ json: { status: "ok", live: true, sleeping: false } }));
   await page.route(/\/(chaos|dlq|tasks)\//, async (r) => {
     const req = r.request();
     posts.push({ url: new URL(req.url()).pathname, body: req.postDataJSON() });
@@ -52,7 +54,7 @@ test("draws the map and the first snapshot", async ({ page }) => {
   await expect(page.locator("canvas")).toBeVisible();
   await expect(summary(page)).toContainText("3 workers (0 busy)");
   await expect(summary(page)).toContainText("3 queued");
-  await expect(page.getByText("Connected")).toBeVisible();
+  await expect(page.getByTestId("pill")).toHaveText("Live Backend Connected");
   await page.screenshot({ path: "test-results/map-idle.png" });
 });
 
@@ -81,7 +83,7 @@ test("events drive the workers, counters, DLQ and circuit gate", async ({ page }
   await expect(page.locator("code", { hasText: "dead-job" })).toBeVisible();
   await page.screenshot({ path: "test-results/map-dead.png" });
 
-  await page.getByRole("button", { name: "Replay" }).click();
+  await page.getByRole("button", { name: "Replay", exact: true }).click();
   await expect.poll(() => server.posts.map((p) => p.url)).toContain("/dlq/dead-job-1234/replay");
   server.send(event("job.replayed", { job_id: "dead-job-1234" }));
   await expect(summary(page)).toContainText("0 dead");
@@ -133,8 +135,12 @@ test("a 429 from the backend is shown, not swallowed", async ({ page }) => {
 
 test("keyboard: every control is reachable with Tab", async ({ page }) => {
   await openTown(page);
-  await page.keyboard.press("Tab");
-  await expect(page.getByRole("combobox", { name: /Worker/ })).toBeFocused();
+  // The preset bar comes first in the page; Tab through it until the chaos panel is reached.
+  const worker = page.getByRole("combobox", { name: /Worker/ });
+  for (let i = 0; i < 30 && !(await worker.evaluate((el) => el === document.activeElement)); i++) {
+    await page.keyboard.press("Tab");
+  }
+  await expect(worker).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(page.getByRole("button", { name: "Kill worker" })).toBeFocused();
 });

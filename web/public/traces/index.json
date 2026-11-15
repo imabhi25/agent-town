@@ -1,0 +1,22 @@
+[
+ {
+  "preset": "happy-path",
+  "name": "Happy path",
+  "description": "A goal is planned into a 4-step task graph (two steps run in parallel) and every job succeeds. An approval gate pauses the last step until it is approved."
+ },
+ {
+  "preset": "retries",
+  "name": "Retries with backoff",
+  "description": "The provider fails half of its calls. Failed jobs retry with exponential backoff and jitter and eventually succeed; none are lost."
+ },
+ {
+  "preset": "chaos-recovery",
+  "name": "Chaos recovery",
+  "description": "A worker is killed in the middle of a job. Its heartbeat expires, another worker reclaims the job (XAUTOCLAIM) and it completes once in effect."
+ },
+ {
+  "preset": "dlq-replay-approval",
+  "name": "DLQ, approval and replay",
+  "description": "A job exhausts its retries and lands in the dead-letter queue while an approval gate waits for a click. After the approval the dead job is replayed and succeeds."
+ }
+]

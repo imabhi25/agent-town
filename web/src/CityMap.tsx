@@ -9,6 +9,8 @@ interface Props {
   state: StoreState;
   api: Api;
   floodMax?: number;
+  off?: string; // why the live controls are disabled ("" = enabled)
+  notify?: (r: ApiResult) => void; // lets the page show 429s; default: a local notice line
 }
 
 interface Overlay {
@@ -33,16 +35,18 @@ declare global {
   }
 }
 
-export function CityMap({ state, api, floodMax = 100 }: Props) {
+export function CityMap({ state, api, floodMax = 100, off = "", notify: report }: Props) {
   const host = useRef<HTMLDivElement>(null);
   const stateRef = useRef(state);
   stateRef.current = state; // the renderer reads the latest store state each frame
   const apiRef = useRef(api);
   apiRef.current = api;
+  const offRef = useRef(off);
+  offRef.current = off;
   const [overlay, setOverlay] = useState<Overlay>(EMPTY);
   const [notice, setNotice] = useState("");
 
-  const notify = (r: ApiResult) => setNotice(r.ok ? "" : r.message);
+  const notify = (r: ApiResult) => (report ? report(r) : setNotice(r.ok ? "" : r.message));
 
   useEffect(() => {
     if (!host.current) return;
@@ -58,7 +62,9 @@ export function CityMap({ state, api, floodMax = 100 }: Props) {
           failureRate: sc.failureRate,
         });
       },
-      onWorkerTap: (id) => void apiRef.current.killWorker(id).then(notify),
+      onWorkerTap: (id) => {
+        if (!offRef.current) void apiRef.current.killWorker(id).then(notify); // not on a recording
+      },
     });
     window.__town = {
       get fps() {
@@ -77,7 +83,7 @@ export function CityMap({ state, api, floodMax = 100 }: Props) {
     <div className="town">
       <div className="map-wrap">
         <div className="map" ref={host} data-testid="map" />
-        <ApprovalCards approvals={overlay.approvals} api={api} notify={notify} />
+        <ApprovalCards approvals={overlay.approvals} api={api} notify={notify} off={off} />
       </div>
       <Legend summary={overlay.summary} />
       {notice && (
@@ -92,8 +98,9 @@ export function CityMap({ state, api, floodMax = 100 }: Props) {
           floodMax={floodMax}
           serverRate={overlay.failureRate}
           notify={notify}
+          off={off}
         />
-        <DeadLetters jobs={overlay.deadJobs} api={api} notify={notify} />
+        <DeadLetters jobs={overlay.deadJobs} api={api} notify={notify} off={off} />
       </div>
     </div>
   );

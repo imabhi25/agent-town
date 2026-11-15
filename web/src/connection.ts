@@ -1,9 +1,7 @@
 // Glue between the network and the pure store. Everything that touches the outside world is
 // injected, so tests can drive it with a fake socket and a fake fetch.
-import { reduce, initialState, type StoreState } from "./store";
+import { TownStore } from "./townStore";
 import type { ServerMessage, Snapshot } from "./types";
-
-export type Status = "connecting" | "open" | "closed";
 
 export interface SocketLike {
   onopen: (() => void) | null;
@@ -24,24 +22,21 @@ export interface ConnectionDeps {
 export const wsUrl = (apiUrl: string) => apiUrl.replace(/^http/, "ws") + "/ws";
 
 export class Connection {
-  state: StoreState = initialState;
-  status: Status = "connecting";
   private socket: SocketLike | null = null;
   private retryTimer: unknown = null;
   private attempt = 0;
   private refreshing = false;
   private stopped = false;
-  private listeners = new Set<() => void>();
-  // Rebuilt on every change so useSyncExternalStore sees a new reference (status included).
-  view: StoreState & { status: Status } = { ...initialState, status: "connecting" };
 
-  constructor(private deps: ConnectionDeps) {}
+  /** The store is shared with the replay engine: the map reads it, whoever fills it. */
+  constructor(
+    private deps: ConnectionDeps,
+    readonly store: TownStore = new TownStore(),
+  ) {}
 
-  subscribe = (fn: () => void) => {
-    this.listeners.add(fn);
-    return () => this.listeners.delete(fn);
-  };
-  getView = () => this.view;
+  get view() {
+    return this.store.view;
+  }
 
   start() {
     this.stopped = false;
@@ -51,34 +46,31 @@ export class Connection {
   stop() {
     this.stopped = true;
     if (this.retryTimer !== null) this.deps.clearTimer(this.retryTimer);
-    this.socket?.close();
-  }
-
-  private emit() {
-    this.view = { ...this.state, status: this.status };
-    this.listeners.forEach((fn) => fn());
+    const socket = this.socket;
+    this.socket = null; // so its late onclose is ignored (it must not flip the status or retry)
+    socket?.close();
   }
 
   private open() {
-    this.status = "connecting";
+    this.store.setStatus("connecting");
     const socket = this.deps.openSocket(wsUrl(this.deps.apiUrl));
     this.socket = socket;
     // A reconnect needs no extra request: the server sends a snapshot first on every new
     // connection (app/main.py), and the store merges it. Only a gap on a live socket needs one.
     socket.onopen = () => {
       this.attempt = 0;
-      this.status = "open";
-      this.emit();
+      this.store.setStatus("open");
     };
-    socket.onmessage = (e) => this.handle(JSON.parse(e.data) as ServerMessage);
+    socket.onmessage = (e) => {
+      if (this.socket !== socket) return; // stopped (e.g. the page switched to a recording)
+      this.handle(JSON.parse(e.data) as ServerMessage);
+    };
     socket.onclose = () => {
       if (this.socket !== socket) return; // an old socket closing late
-      this.status = "closed";
-      this.emit();
+      this.store.setStatus("closed");
       if (!this.stopped) this.scheduleReconnect();
     };
     socket.onerror = () => socket.close();
-    this.emit();
   }
 
   private scheduleReconnect() {
@@ -88,10 +80,7 @@ export class Connection {
   }
 
   private handle(msg: ServerMessage) {
-    const { state, needSnapshot } = reduce(this.state, msg);
-    this.state = state;
-    this.emit();
-    if (needSnapshot) void this.refreshSnapshot();
+    if (this.store.dispatch(msg)) void this.refreshSnapshot();
   }
 
   /** GET /state. One request at a time: more gaps while one is in flight are covered by it. */
@@ -100,7 +89,7 @@ export class Connection {
     this.refreshing = true;
     try {
       const snap = (await this.deps.fetchJson(`${this.deps.apiUrl}/state`)) as Snapshot;
-      this.handle(snap);
+      if (!this.stopped) this.handle(snap); // a late answer must not leak into another source
     } catch {
       // Leave the gap; the next dropped batch or reconnect asks again.
     } finally {

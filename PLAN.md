@@ -22,7 +22,7 @@
 - [ ] Panels: event log, task checklist, throughput, p99, queue depth (queue depth and counts are in the map summary; the rest is later)
 - [x] Cap mock_latency and only accept mock_* fields from trusted input (payload fields can currently make a worker sleep arbitrarily long)
 - [x] Chaos panel (kill worker, failure rate, flood), approval card, DLQ replay (step 7)
-- [ ] Chat panel (prompt box) and recorded/live modes (step 8)
+- [x] Prompt box and recorded/live modes: 4 recorded presets from the real engine, replay engine, health ping (step 8)
 - [ ] Optional: isometric art with a free asset pack (+2-3 days)
 
 ## Week 4: ship

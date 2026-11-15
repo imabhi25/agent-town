@@ -1,0 +1,534 @@
+{
+ "preset": "retries",
+ "name": "Retries with backoff",
+ "description": "The provider fails half of its calls. Failed jobs retry with exponential backoff and jitter and eventually succeed; none are lost.",
+ "recorded_at": "2026-11-15T23:14:57.116371Z",
+ "snapshot": {
+  "type": "snapshot",
+  "goals": [],
+  "tasks": [],
+  "workers": [
+   {
+    "id": "worker-1",
+    "job_id": null
+   },
+   {
+    "id": "worker-2",
+    "job_id": null
+   },
+   {
+    "id": "worker-3",
+    "job_id": null
+   }
+  ],
+  "queue": {
+   "depth": 0,
+   "queued": 0,
+   "retrying": 0,
+   "running": 0,
+   "succeeded": 0,
+   "dead": 0
+  },
+  "stats": {
+   "throughput_per_sec": 0.0,
+   "completed_last_minute": 0,
+   "succeeded": 0,
+   "retries": 0,
+   "dead": 0,
+   "latency_ms": {
+    "p50": null,
+    "p95": null,
+    "p99": null,
+    "samples": 0,
+    "window_seconds": 300
+   },
+   "queue_depth": 0,
+   "running": 0,
+   "active_workers": 3
+  },
+  "dead_jobs": [],
+  "events": [],
+  "last_event_id": "0-0"
+ },
+ "events": [
+  {
+   "id": 1,
+   "stream_id": "1794784486537-0",
+   "type": "chaos.config",
+   "payload": {
+    "max_latency": 0.9,
+    "min_latency": 0.4,
+    "failure_rate": 0.5
+   },
+   "ts": "2026-11-15T23:14:46.492273Z"
+  },
+  {
+   "id": 2,
+   "stream_id": "1794784486538-0",
+   "type": "goal.created",
+   "payload": {
+    "job_id": "19625b35-44a3-4ef0-b73a-016ab9953b15",
+    "goal_id": "3c6bbb27-b177-4991-aba2-6dd75caf83e9"
+   },
+   "ts": "2026-11-15T23:14:46.494047Z"
+  },
+  {
+   "id": 3,
+   "stream_id": "1794784486541-0",
+   "type": "job.started",
+   "payload": {
+    "job_id": "19625b35-44a3-4ef0-b73a-016ab9953b15",
+    "worker": "worker-1"
+   },
+   "ts": "2026-11-15T23:14:46.538447Z"
+  },
+  {
+   "id": 4,
+   "stream_id": "1794784486595-0",
+   "type": "job.succeeded",
+   "payload": {
+    "job_id": "19625b35-44a3-4ef0-b73a-016ab9953b15",
+    "worker": "worker-1"
+   },
+   "ts": "2026-11-15T23:14:46.540911Z"
+  },
+  {
+   "id": 5,
+   "stream_id": "1794784486595-1",
+   "type": "goal.planned",
+   "payload": {
+    "source": "mock",
+    "goal_id": "3c6bbb27-b177-4991-aba2-6dd75caf83e9",
+    "task_count": 4
+   },
+   "ts": "2026-11-15T23:14:46.540911Z"
+  },
+  {
+   "id": 6,
+   "stream_id": "1794784486595-2",
+   "type": "task.created",
+   "payload": {
+    "key": "t1",
+    "name": "Research",
+    "goal_id": "3c6bbb27-b177-4991-aba2-6dd75caf83e9",
+    "task_id": "cac5ad04-869d-4ea9-bf58-5487ce92e3b6",
+    "depends_on": [],
+    "needs_approval": false
+   },
+   "ts": "2026-11-15T23:14:46.540911Z"
+  },
+  {
+   "id": 7,
+   "stream_id": "1794784486596-0",
+   "type": "task.created",
+   "payload": {
+    "key": "t2",
+    "name": "Outline",
+    "goal_id": "3c6bbb27-b177-4991-aba2-6dd75caf83e9",
+    "task_id": "c24b8f44-fae2-474f-8f7c-5726b8ce4841",
+    "depends_on": [
+     "cac5ad04-869d-4ea9-bf58-5487ce92e3b6"
+    ],
+    "needs_approval": false
+   },
+   "ts": "2026-11-15T23:14:46.540911Z"
+  },
+  {
+   "id": 8,
+   "stream_id": "1794784486596-1",
+   "type": "task.created",
+   "payload": {
+    "key": "t3",
+    "name": "Draft",
+    "goal_id": "3c6bbb27-b177-4991-aba2-6dd75caf83e9",
+    "task_id": "674060c7-cbfd-414e-badd-32d7d9828e66",
+    "depends_on": [
+     "cac5ad04-869d-4ea9-bf58-5487ce92e3b6"
+    ],
+    "needs_approval": false
+   },
+   "ts": "2026-11-15T23:14:46.540911Z"
+  },
+  {
+   "id": 9,
+   "stream_id": "1794784486596-2",
+   "type": "task.created",
+   "payload": {
+    "key": "t4",
+    "name": "Review and publish",
+    "goal_id": "3c6bbb27-b177-4991-aba2-6dd75caf83e9",
+    "task_id": "a83c2f57-4ba3-43c6-a0ce-ee3725f60cb6",
+    "depends_on": [
+     "c24b8f44-fae2-474f-8f7c-5726b8ce4841",
+     "674060c7-cbfd-414e-badd-32d7d9828e66"
+    ],
+    "needs_approval": true
+   },
+   "ts": "2026-11-15T23:14:46.540911Z"
+  },
+  {
+   "id": 10,
+   "stream_id": "1794784486597-0",
+   "type": "goal.started",
+   "payload": {
+    "goal_id": "3c6bbb27-b177-4991-aba2-6dd75caf83e9"
+   },
+   "ts": "2026-11-15T23:14:46.540911Z"
+  },
+  {
+   "id": 11,
+   "stream_id": "1794784486597-1",
+   "type": "task.queued",
+   "payload": {
+    "job_id": "4962782a-ac30-4f13-9c08-50ea99f86e51",
+    "goal_id": "3c6bbb27-b177-4991-aba2-6dd75caf83e9",
+    "task_id": "cac5ad04-869d-4ea9-bf58-5487ce92e3b6"
+   },
+   "ts": "2026-11-15T23:14:46.540911Z"
+  },
+  {
+   "id": 12,
+   "stream_id": "1794784486599-0",
+   "type": "job.started",
+   "payload": {
+    "job_id": "4962782a-ac30-4f13-9c08-50ea99f86e51",
+    "worker": "worker-3"
+   },
+   "ts": "2026-11-15T23:14:46.594707Z"
+  },
+  {
+   "id": 13,
+   "stream_id": "1794784487125-0",
+   "type": "job.succeeded",
+   "payload": {
+    "job_id": "4962782a-ac30-4f13-9c08-50ea99f86e51",
+    "worker": "worker-3"
+   },
+   "ts": "2026-11-15T23:14:47.066390Z"
+  },
+  {
+   "id": 14,
+   "stream_id": "1794784487127-0",
+   "type": "task.succeeded",
+   "payload": {
+    "goal_id": "3c6bbb27-b177-4991-aba2-6dd75caf83e9",
+    "task_id": "cac5ad04-869d-4ea9-bf58-5487ce92e3b6"
+   },
+   "ts": "2026-11-15T23:14:47.066390Z"
+  },
+  {
+   "id": 15,
+   "stream_id": "1794784487127-1",
+   "type": "task.queued",
+   "payload": {
+    "job_id": "6b3bc202-97dd-4a1f-929c-065f8a12886f",
+    "goal_id": "3c6bbb27-b177-4991-aba2-6dd75caf83e9",
+    "task_id": "c24b8f44-fae2-474f-8f7c-5726b8ce4841"
+   },
+   "ts": "2026-11-15T23:14:47.066390Z"
+  },
+  {
+   "id": 16,
+   "stream_id": "1794784487128-0",
+   "type": "task.queued",
+   "payload": {
+    "job_id": "3a0d52d2-a2f3-4891-87e6-2e108a7cf05b",
+    "goal_id": "3c6bbb27-b177-4991-aba2-6dd75caf83e9",
+    "task_id": "674060c7-cbfd-414e-badd-32d7d9828e66"
+   },
+   "ts": "2026-11-15T23:14:47.066390Z"
+  },
+  {
+   "id": 18,
+   "stream_id": "1794784487132-1",
+   "type": "job.started",
+   "payload": {
+    "job_id": "6b3bc202-97dd-4a1f-929c-065f8a12886f",
+    "worker": "worker-1"
+   },
+   "ts": "2026-11-15T23:14:47.125387Z"
+  },
+  {
+   "id": 17,
+   "stream_id": "1794784487132-0",
+   "type": "job.started",
+   "payload": {
+    "job_id": "3a0d52d2-a2f3-4891-87e6-2e108a7cf05b",
+    "worker": "worker-3"
+   },
+   "ts": "2026-11-15T23:14:47.126731Z"
+  },
+  {
+   "id": 19,
+   "stream_id": "1794784487709-0",
+   "type": "job.retry_scheduled",
+   "payload": {
+    "delay": 0.283,
+    "error": "mock provider error 500",
+    "job_id": "6b3bc202-97dd-4a1f-929c-065f8a12886f",
+    "worker": "worker-1",
+    "attempt": 1
+   },
+   "ts": "2026-11-15T23:14:47.659808Z"
+  },
+  {
+   "id": 20,
+   "stream_id": "1794784487918-0",
+   "type": "job.retry_scheduled",
+   "payload": {
+    "delay": 0.056,
+    "error": "mock provider error 429",
+    "job_id": "3a0d52d2-a2f3-4891-87e6-2e108a7cf05b",
+    "worker": "worker-3",
+    "attempt": 1
+   },
+   "ts": "2026-11-15T23:14:47.913795Z"
+  },
+  {
+   "id": 21,
+   "stream_id": "1794784488022-0",
+   "type": "job.started",
+   "payload": {
+    "job_id": "6b3bc202-97dd-4a1f-929c-065f8a12886f",
+    "worker": "worker-3"
+   },
+   "ts": "2026-11-15T23:14:47.995060Z"
+  },
+  {
+   "id": 22,
+   "stream_id": "1794784488022-1",
+   "type": "job.started",
+   "payload": {
+    "job_id": "3a0d52d2-a2f3-4891-87e6-2e108a7cf05b",
+    "worker": "worker-2"
+   },
+   "ts": "2026-11-15T23:14:47.996309Z"
+  },
+  {
+   "id": 23,
+   "stream_id": "1794784488439-0",
+   "type": "job.retry_scheduled",
+   "payload": {
+    "delay": 0.835,
+    "error": "mock provider error 429",
+    "job_id": "6b3bc202-97dd-4a1f-929c-065f8a12886f",
+    "worker": "worker-3",
+    "attempt": 2
+   },
+   "ts": "2026-11-15T23:14:48.411829Z"
+  },
+  {
+   "id": 24,
+   "stream_id": "1794784488857-0",
+   "type": "job.retry_scheduled",
+   "payload": {
+    "delay": 0.709,
+    "error": "mock provider error 429",
+    "job_id": "3a0d52d2-a2f3-4891-87e6-2e108a7cf05b",
+    "worker": "worker-2",
+    "attempt": 2
+   },
+   "ts": "2026-11-15T23:14:48.816474Z"
+  },
+  {
+   "id": 25,
+   "stream_id": "1794784489342-0",
+   "type": "job.started",
+   "payload": {
+    "job_id": "6b3bc202-97dd-4a1f-929c-065f8a12886f",
+    "worker": "worker-2"
+   },
+   "ts": "2026-11-15T23:14:49.323013Z"
+  },
+  {
+   "id": 26,
+   "stream_id": "1794784489660-0",
+   "type": "job.started",
+   "payload": {
+    "job_id": "3a0d52d2-a2f3-4891-87e6-2e108a7cf05b",
+    "worker": "worker-3"
+   },
+   "ts": "2026-11-15T23:14:49.630216Z"
+  },
+  {
+   "id": 27,
+   "stream_id": "1794784489820-0",
+   "type": "job.retry_scheduled",
+   "payload": {
+    "delay": 2.254,
+    "error": "mock provider error 429",
+    "job_id": "6b3bc202-97dd-4a1f-929c-065f8a12886f",
+    "worker": "worker-2",
+    "attempt": 3
+   },
+   "ts": "2026-11-15T23:14:49.777252Z"
+  },
+  {
+   "id": 28,
+   "stream_id": "1794784490244-0",
+   "type": "job.retry_scheduled",
+   "payload": {
+    "delay": 2.326,
+    "error": "mock provider error 429",
+    "job_id": "3a0d52d2-a2f3-4891-87e6-2e108a7cf05b",
+    "worker": "worker-3",
+    "attempt": 3
+   },
+   "ts": "2026-11-15T23:14:50.192363Z"
+  },
+  {
+   "id": 29,
+   "stream_id": "1794784492096-0",
+   "type": "job.started",
+   "payload": {
+    "job_id": "6b3bc202-97dd-4a1f-929c-065f8a12886f",
+    "worker": "worker-2"
+   },
+   "ts": "2026-11-15T23:14:52.074792Z"
+  },
+  {
+   "id": 30,
+   "stream_id": "1794784492628-0",
+   "type": "job.started",
+   "payload": {
+    "job_id": "3a0d52d2-a2f3-4891-87e6-2e108a7cf05b",
+    "worker": "worker-3"
+   },
+   "ts": "2026-11-15T23:14:52.587703Z"
+  },
+  {
+   "id": 31,
+   "stream_id": "1794784492892-0",
+   "type": "job.succeeded",
+   "payload": {
+    "job_id": "6b3bc202-97dd-4a1f-929c-065f8a12886f",
+    "worker": "worker-2"
+   },
+   "ts": "2026-11-15T23:14:52.840892Z"
+  },
+  {
+   "id": 32,
+   "stream_id": "1794784492893-0",
+   "type": "task.succeeded",
+   "payload": {
+    "goal_id": "3c6bbb27-b177-4991-aba2-6dd75caf83e9",
+    "task_id": "c24b8f44-fae2-474f-8f7c-5726b8ce4841"
+   },
+   "ts": "2026-11-15T23:14:52.840892Z"
+  },
+  {
+   "id": 33,
+   "stream_id": "1794784493260-0",
+   "type": "job.succeeded",
+   "payload": {
+    "job_id": "3a0d52d2-a2f3-4891-87e6-2e108a7cf05b",
+    "worker": "worker-3"
+   },
+   "ts": "2026-11-15T23:14:53.255284Z"
+  },
+  {
+   "id": 34,
+   "stream_id": "1794784493260-1",
+   "type": "task.succeeded",
+   "payload": {
+    "goal_id": "3c6bbb27-b177-4991-aba2-6dd75caf83e9",
+    "task_id": "674060c7-cbfd-414e-badd-32d7d9828e66"
+   },
+   "ts": "2026-11-15T23:14:53.255284Z"
+  },
+  {
+   "id": 35,
+   "stream_id": "1794784493261-0",
+   "type": "task.awaiting_approval",
+   "payload": {
+    "name": "Review and publish",
+    "goal_id": "3c6bbb27-b177-4991-aba2-6dd75caf83e9",
+    "task_id": "a83c2f57-4ba3-43c6-a0ce-ee3725f60cb6"
+   },
+   "ts": "2026-11-15T23:14:53.255284Z"
+  },
+  {
+   "id": 36,
+   "stream_id": "1794784494861-0",
+   "type": "task.approved",
+   "payload": {
+    "goal_id": "3c6bbb27-b177-4991-aba2-6dd75caf83e9",
+    "task_id": "a83c2f57-4ba3-43c6-a0ce-ee3725f60cb6"
+   },
+   "ts": "2026-11-15T23:14:54.848441Z"
+  },
+  {
+   "id": 37,
+   "stream_id": "1794784494862-0",
+   "type": "task.queued",
+   "payload": {
+    "job_id": "54fd5f2a-b31f-4d1b-b2e3-abaeba666dce",
+    "goal_id": "3c6bbb27-b177-4991-aba2-6dd75caf83e9",
+    "task_id": "a83c2f57-4ba3-43c6-a0ce-ee3725f60cb6"
+   },
+   "ts": "2026-11-15T23:14:54.848441Z"
+  },
+  {
+   "id": 38,
+   "stream_id": "1794784494916-0",
+   "type": "job.started",
+   "payload": {
+    "job_id": "54fd5f2a-b31f-4d1b-b2e3-abaeba666dce",
+    "worker": "worker-2"
+   },
+   "ts": "2026-11-15T23:14:54.861603Z"
+  },
+  {
+   "id": 39,
+   "stream_id": "1794784495546-0",
+   "type": "job.retry_scheduled",
+   "payload": {
+    "delay": 0.457,
+    "error": "mock provider error 429",
+    "job_id": "54fd5f2a-b31f-4d1b-b2e3-abaeba666dce",
+    "worker": "worker-2",
+    "attempt": 1
+   },
+   "ts": "2026-11-15T23:14:55.542321Z"
+  },
+  {
+   "id": 40,
+   "stream_id": "1794784496072-0",
+   "type": "job.started",
+   "payload": {
+    "job_id": "54fd5f2a-b31f-4d1b-b2e3-abaeba666dce",
+    "worker": "worker-2"
+   },
+   "ts": "2026-11-15T23:14:56.057856Z"
+  },
+  {
+   "id": 41,
+   "stream_id": "1794784496969-0",
+   "type": "job.succeeded",
+   "payload": {
+    "job_id": "54fd5f2a-b31f-4d1b-b2e3-abaeba666dce",
+    "worker": "worker-2"
+   },
+   "ts": "2026-11-15T23:14:56.937235Z"
+  },
+  {
+   "id": 42,
+   "stream_id": "1794784496969-1",
+   "type": "task.succeeded",
+   "payload": {
+    "goal_id": "3c6bbb27-b177-4991-aba2-6dd75caf83e9",
+    "task_id": "a83c2f57-4ba3-43c6-a0ce-ee3725f60cb6"
+   },
+   "ts": "2026-11-15T23:14:56.937235Z"
+  },
+  {
+   "id": 43,
+   "stream_id": "1794784496970-0",
+   "type": "goal.succeeded",
+   "payload": {
+    "goal_id": "3c6bbb27-b177-4991-aba2-6dd75caf83e9"
+   },
+   "ts": "2026-11-15T23:14:56.937235Z"
+  }
+ ]
+}

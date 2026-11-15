@@ -1,0 +1,501 @@
+{
+ "preset": "chaos-recovery",
+ "name": "Chaos recovery",
+ "description": "A worker is killed in the middle of a job. Its heartbeat expires, another worker reclaims the job (XAUTOCLAIM) and it completes once in effect.",
+ "recorded_at": "2026-11-15T23:15:04.939106Z",
+ "snapshot": {
+  "type": "snapshot",
+  "goals": [],
+  "tasks": [],
+  "workers": [
+   {
+    "id": "worker-1",
+    "job_id": null
+   },
+   {
+    "id": "worker-2",
+    "job_id": null
+   },
+   {
+    "id": "worker-3",
+    "job_id": null
+   }
+  ],
+  "queue": {
+   "depth": 0,
+   "queued": 0,
+   "retrying": 0,
+   "running": 0,
+   "succeeded": 0,
+   "dead": 0
+  },
+  "stats": {
+   "throughput_per_sec": 0.0,
+   "completed_last_minute": 0,
+   "succeeded": 0,
+   "retries": 0,
+   "dead": 0,
+   "latency_ms": {
+    "p50": null,
+    "p95": null,
+    "p99": null,
+    "samples": 0,
+    "window_seconds": 300
+   },
+   "queue_depth": 0,
+   "running": 0,
+   "active_workers": 3
+  },
+  "dead_jobs": [],
+  "events": [],
+  "last_event_id": "0-0"
+ },
+ "events": [
+  {
+   "id": 1,
+   "stream_id": "1794784497462-0",
+   "type": "chaos.config",
+   "payload": {
+    "max_latency": 1.6,
+    "min_latency": 1.0,
+    "failure_rate": 0.0
+   },
+   "ts": "2026-11-15T23:14:57.455609Z"
+  },
+  {
+   "id": 2,
+   "stream_id": "1794784497462-1",
+   "type": "goal.created",
+   "payload": {
+    "job_id": "f1149f83-552a-44fd-a026-9ba634374b06",
+    "goal_id": "667b5fea-b22c-4d1d-bcf6-40f1a7af351c"
+   },
+   "ts": "2026-11-15T23:14:57.458685Z"
+  },
+  {
+   "id": 3,
+   "stream_id": "1794784497524-0",
+   "type": "chaos.flood",
+   "payload": {
+    "count": 4
+   },
+   "ts": "2026-11-15T23:14:57.464348Z"
+  },
+  {
+   "id": 5,
+   "stream_id": "1794784497525-1",
+   "type": "job.started",
+   "payload": {
+    "job_id": "f1149f83-552a-44fd-a026-9ba634374b06",
+    "worker": "worker-3"
+   },
+   "ts": "2026-11-15T23:14:57.513009Z"
+  },
+  {
+   "id": 4,
+   "stream_id": "1794784497525-0",
+   "type": "job.started",
+   "payload": {
+    "job_id": "b715e706-0a1d-44e8-befc-5294de0b4bfa",
+    "worker": "worker-2"
+   },
+   "ts": "2026-11-15T23:14:57.513704Z"
+  },
+  {
+   "id": 6,
+   "stream_id": "1794784497525-2",
+   "type": "job.started",
+   "payload": {
+    "job_id": "2d7b12e8-b7e5-496e-98b9-cef3e7752738",
+    "worker": "worker-1"
+   },
+   "ts": "2026-11-15T23:14:57.513927Z"
+  },
+  {
+   "id": 7,
+   "stream_id": "1794784497533-0",
+   "type": "job.succeeded",
+   "payload": {
+    "job_id": "f1149f83-552a-44fd-a026-9ba634374b06",
+    "worker": "worker-3"
+   },
+   "ts": "2026-11-15T23:14:57.520116Z"
+  },
+  {
+   "id": 8,
+   "stream_id": "1794784497534-0",
+   "type": "goal.planned",
+   "payload": {
+    "source": "mock",
+    "goal_id": "667b5fea-b22c-4d1d-bcf6-40f1a7af351c",
+    "task_count": 4
+   },
+   "ts": "2026-11-15T23:14:57.520116Z"
+  },
+  {
+   "id": 9,
+   "stream_id": "1794784497534-1",
+   "type": "task.created",
+   "payload": {
+    "key": "t1",
+    "name": "Research",
+    "goal_id": "667b5fea-b22c-4d1d-bcf6-40f1a7af351c",
+    "task_id": "fe9fbca2-6364-4fc9-aeb5-56dcbd708a89",
+    "depends_on": [],
+    "needs_approval": false
+   },
+   "ts": "2026-11-15T23:14:57.520116Z"
+  },
+  {
+   "id": 10,
+   "stream_id": "1794784497534-2",
+   "type": "task.created",
+   "payload": {
+    "key": "t2",
+    "name": "Outline",
+    "goal_id": "667b5fea-b22c-4d1d-bcf6-40f1a7af351c",
+    "task_id": "33241d47-ee43-4aa1-8e03-bce6726dfe7e",
+    "depends_on": [
+     "fe9fbca2-6364-4fc9-aeb5-56dcbd708a89"
+    ],
+    "needs_approval": false
+   },
+   "ts": "2026-11-15T23:14:57.520116Z"
+  },
+  {
+   "id": 11,
+   "stream_id": "1794784497534-3",
+   "type": "task.created",
+   "payload": {
+    "key": "t3",
+    "name": "Draft",
+    "goal_id": "667b5fea-b22c-4d1d-bcf6-40f1a7af351c",
+    "task_id": "b5eb8286-f263-4849-a955-78fbc7466f26",
+    "depends_on": [
+     "fe9fbca2-6364-4fc9-aeb5-56dcbd708a89"
+    ],
+    "needs_approval": false
+   },
+   "ts": "2026-11-15T23:14:57.520116Z"
+  },
+  {
+   "id": 12,
+   "stream_id": "1794784497534-4",
+   "type": "task.created",
+   "payload": {
+    "key": "t4",
+    "name": "Review and publish",
+    "goal_id": "667b5fea-b22c-4d1d-bcf6-40f1a7af351c",
+    "task_id": "c571e872-bbb3-40f5-bb2f-078271addd93",
+    "depends_on": [
+     "33241d47-ee43-4aa1-8e03-bce6726dfe7e",
+     "b5eb8286-f263-4849-a955-78fbc7466f26"
+    ],
+    "needs_approval": true
+   },
+   "ts": "2026-11-15T23:14:57.520116Z"
+  },
+  {
+   "id": 13,
+   "stream_id": "1794784497534-5",
+   "type": "goal.started",
+   "payload": {
+    "goal_id": "667b5fea-b22c-4d1d-bcf6-40f1a7af351c"
+   },
+   "ts": "2026-11-15T23:14:57.520116Z"
+  },
+  {
+   "id": 14,
+   "stream_id": "1794784497534-6",
+   "type": "task.queued",
+   "payload": {
+    "job_id": "b59641f2-6868-443d-804b-b318492ae7d1",
+    "goal_id": "667b5fea-b22c-4d1d-bcf6-40f1a7af351c",
+    "task_id": "fe9fbca2-6364-4fc9-aeb5-56dcbd708a89"
+   },
+   "ts": "2026-11-15T23:14:57.520116Z"
+  },
+  {
+   "id": 15,
+   "stream_id": "1794784497535-0",
+   "type": "job.started",
+   "payload": {
+    "job_id": "e97770b5-79f9-4d15-8af5-a38618aaab09",
+    "worker": "worker-3"
+   },
+   "ts": "2026-11-15T23:14:57.528376Z"
+  },
+  {
+   "id": 16,
+   "stream_id": "1794784497902-0",
+   "type": "worker.killed",
+   "payload": {
+    "worker": "worker-2"
+   },
+   "ts": "2026-11-15T23:14:57.871369Z"
+  },
+  {
+   "id": 17,
+   "stream_id": "1794784497902-1",
+   "type": "worker.started",
+   "payload": {
+    "worker": "worker-4"
+   },
+   "ts": "2026-11-15T23:14:57.876650Z"
+  },
+  {
+   "id": 18,
+   "stream_id": "1794784497902-2",
+   "type": "job.started",
+   "payload": {
+    "job_id": "27514172-31b4-4f1d-a4b1-a982a559dbb9",
+    "worker": "worker-4"
+   },
+   "ts": "2026-11-15T23:14:57.877823Z"
+  },
+  {
+   "id": 19,
+   "stream_id": "1794784499021-0",
+   "type": "job.succeeded",
+   "payload": {
+    "job_id": "e97770b5-79f9-4d15-8af5-a38618aaab09",
+    "worker": "worker-3"
+   },
+   "ts": "2026-11-15T23:14:58.987794Z"
+  },
+  {
+   "id": 20,
+   "stream_id": "1794784499022-0",
+   "type": "job.started",
+   "payload": {
+    "job_id": "b59641f2-6868-443d-804b-b318492ae7d1",
+    "worker": "worker-3"
+   },
+   "ts": "2026-11-15T23:14:58.991727Z"
+  },
+  {
+   "id": 21,
+   "stream_id": "1794784499076-0",
+   "type": "job.succeeded",
+   "payload": {
+    "job_id": "2d7b12e8-b7e5-496e-98b9-cef3e7752738",
+    "worker": "worker-1"
+   },
+   "ts": "2026-11-15T23:14:59.029714Z"
+  },
+  {
+   "id": 22,
+   "stream_id": "1794784499077-0",
+   "type": "job.succeeded",
+   "payload": {
+    "job_id": "27514172-31b4-4f1d-a4b1-a982a559dbb9",
+    "worker": "worker-4"
+   },
+   "ts": "2026-11-15T23:14:59.034366Z"
+  },
+  {
+   "id": 23,
+   "stream_id": "1794784499712-0",
+   "type": "job.recovered",
+   "payload": {
+    "job_id": "b715e706-0a1d-44e8-befc-5294de0b4bfa",
+    "new_worker": "worker-4",
+    "previous_worker": "worker-2"
+   },
+   "ts": "2026-11-15T23:14:59.659128Z"
+  },
+  {
+   "id": 24,
+   "stream_id": "1794784499713-0",
+   "type": "job.started",
+   "payload": {
+    "job_id": "b715e706-0a1d-44e8-befc-5294de0b4bfa",
+    "worker": "worker-4"
+   },
+   "ts": "2026-11-15T23:14:59.659128Z"
+  },
+  {
+   "id": 25,
+   "stream_id": "1794784500293-0",
+   "type": "job.succeeded",
+   "payload": {
+    "job_id": "b59641f2-6868-443d-804b-b318492ae7d1",
+    "worker": "worker-3"
+   },
+   "ts": "2026-11-15T23:15:00.264131Z"
+  },
+  {
+   "id": 26,
+   "stream_id": "1794784500294-0",
+   "type": "task.succeeded",
+   "payload": {
+    "goal_id": "667b5fea-b22c-4d1d-bcf6-40f1a7af351c",
+    "task_id": "fe9fbca2-6364-4fc9-aeb5-56dcbd708a89"
+   },
+   "ts": "2026-11-15T23:15:00.264131Z"
+  },
+  {
+   "id": 27,
+   "stream_id": "1794784500294-1",
+   "type": "task.queued",
+   "payload": {
+    "job_id": "b1ea7ad9-c535-442c-bfea-6b0fd4beeea8",
+    "goal_id": "667b5fea-b22c-4d1d-bcf6-40f1a7af351c",
+    "task_id": "33241d47-ee43-4aa1-8e03-bce6726dfe7e"
+   },
+   "ts": "2026-11-15T23:15:00.264131Z"
+  },
+  {
+   "id": 28,
+   "stream_id": "1794784500295-0",
+   "type": "task.queued",
+   "payload": {
+    "job_id": "0beda3d2-ad62-41dc-a019-5cbf4f566bc4",
+    "goal_id": "667b5fea-b22c-4d1d-bcf6-40f1a7af351c",
+    "task_id": "b5eb8286-f263-4849-a955-78fbc7466f26"
+   },
+   "ts": "2026-11-15T23:15:00.264131Z"
+  },
+  {
+   "id": 29,
+   "stream_id": "1794784500299-0",
+   "type": "job.started",
+   "payload": {
+    "job_id": "b1ea7ad9-c535-442c-bfea-6b0fd4beeea8",
+    "worker": "worker-1"
+   },
+   "ts": "2026-11-15T23:15:00.293722Z"
+  },
+  {
+   "id": 30,
+   "stream_id": "1794784500300-0",
+   "type": "job.started",
+   "payload": {
+    "job_id": "0beda3d2-ad62-41dc-a019-5cbf4f566bc4",
+    "worker": "worker-3"
+   },
+   "ts": "2026-11-15T23:15:00.294723Z"
+  },
+  {
+   "id": 31,
+   "stream_id": "1794784500774-0",
+   "type": "job.succeeded",
+   "payload": {
+    "job_id": "b715e706-0a1d-44e8-befc-5294de0b4bfa",
+    "worker": "worker-4"
+   },
+   "ts": "2026-11-15T23:15:00.719865Z"
+  },
+  {
+   "id": 32,
+   "stream_id": "1794784501614-0",
+   "type": "job.succeeded",
+   "payload": {
+    "job_id": "0beda3d2-ad62-41dc-a019-5cbf4f566bc4",
+    "worker": "worker-3"
+   },
+   "ts": "2026-11-15T23:15:01.560125Z"
+  },
+  {
+   "id": 33,
+   "stream_id": "1794784501614-1",
+   "type": "task.succeeded",
+   "payload": {
+    "goal_id": "667b5fea-b22c-4d1d-bcf6-40f1a7af351c",
+    "task_id": "b5eb8286-f263-4849-a955-78fbc7466f26"
+   },
+   "ts": "2026-11-15T23:15:01.560125Z"
+  },
+  {
+   "id": 34,
+   "stream_id": "1794784501823-0",
+   "type": "job.succeeded",
+   "payload": {
+    "job_id": "b1ea7ad9-c535-442c-bfea-6b0fd4beeea8",
+    "worker": "worker-1"
+   },
+   "ts": "2026-11-15T23:15:01.800732Z"
+  },
+  {
+   "id": 35,
+   "stream_id": "1794784501824-0",
+   "type": "task.succeeded",
+   "payload": {
+    "goal_id": "667b5fea-b22c-4d1d-bcf6-40f1a7af351c",
+    "task_id": "33241d47-ee43-4aa1-8e03-bce6726dfe7e"
+   },
+   "ts": "2026-11-15T23:15:01.800732Z"
+  },
+  {
+   "id": 36,
+   "stream_id": "1794784501824-1",
+   "type": "task.awaiting_approval",
+   "payload": {
+    "name": "Review and publish",
+    "goal_id": "667b5fea-b22c-4d1d-bcf6-40f1a7af351c",
+    "task_id": "c571e872-bbb3-40f5-bb2f-078271addd93"
+   },
+   "ts": "2026-11-15T23:15:01.800732Z"
+  },
+  {
+   "id": 37,
+   "stream_id": "1794784503406-0",
+   "type": "task.approved",
+   "payload": {
+    "goal_id": "667b5fea-b22c-4d1d-bcf6-40f1a7af351c",
+    "task_id": "c571e872-bbb3-40f5-bb2f-078271addd93"
+   },
+   "ts": "2026-11-15T23:15:03.356418Z"
+  },
+  {
+   "id": 38,
+   "stream_id": "1794784503407-0",
+   "type": "task.queued",
+   "payload": {
+    "job_id": "a33c2edf-9dbc-4bdf-8364-a55d68266165",
+    "goal_id": "667b5fea-b22c-4d1d-bcf6-40f1a7af351c",
+    "task_id": "c571e872-bbb3-40f5-bb2f-078271addd93"
+   },
+   "ts": "2026-11-15T23:15:03.356418Z"
+  },
+  {
+   "id": 39,
+   "stream_id": "1794784503410-0",
+   "type": "job.started",
+   "payload": {
+    "job_id": "a33c2edf-9dbc-4bdf-8364-a55d68266165",
+    "worker": "worker-1"
+   },
+   "ts": "2026-11-15T23:15:03.406373Z"
+  },
+  {
+   "id": 40,
+   "stream_id": "1794784504885-0",
+   "type": "job.succeeded",
+   "payload": {
+    "job_id": "a33c2edf-9dbc-4bdf-8364-a55d68266165",
+    "worker": "worker-1"
+   },
+   "ts": "2026-11-15T23:15:04.843661Z"
+  },
+  {
+   "id": 41,
+   "stream_id": "1794784504886-0",
+   "type": "task.succeeded",
+   "payload": {
+    "goal_id": "667b5fea-b22c-4d1d-bcf6-40f1a7af351c",
+    "task_id": "c571e872-bbb3-40f5-bb2f-078271addd93"
+   },
+   "ts": "2026-11-15T23:15:04.843661Z"
+  },
+  {
+   "id": 42,
+   "stream_id": "1794784504886-1",
+   "type": "goal.succeeded",
+   "payload": {
+    "goal_id": "667b5fea-b22c-4d1d-bcf6-40f1a7af351c"
+   },
+   "ts": "2026-11-15T23:15:04.843661Z"
+  }
+ ]
+}
