@@ -187,8 +187,8 @@ def _row(record: asyncpg.Record, *fields: str) -> dict:
 async def build_snapshot(
     pool: asyncpg.Pool, redis: Redis, up_to: str = "+", worker_ids: list[str] | None = None
 ) -> dict:
-    """Everything a client needs to draw the world: goals, tasks, workers, queue depth and the
-    last 100 events (oldest first, up to the stream id `up_to`)."""
+    """Everything a client needs to draw the world: goals, tasks, workers, queue depth, dead
+    jobs (for replay) and the last 100 events (oldest first, up to the stream id `up_to`)."""
     goal_rows = await pool.fetch(
         """
         SELECT id, prompt, status, plan_source, error, created_at
@@ -212,6 +212,9 @@ async def build_snapshot(
         r["locked_by"]: str(r["id"])
         for r in await pool.fetch("SELECT id, locked_by FROM jobs WHERE status = 'running'")
     }
+    dead_rows = await pool.fetch(
+        "SELECT id, type FROM jobs WHERE status = 'dead' ORDER BY updated_at DESC LIMIT 20"
+    )
     if worker_ids is None:
         worker_ids = sorted([k.split(":", 2)[2] async for k in redis.scan_iter("worker:hb:*")])
     entries = await redis.xrevrange(EVENTS_STREAM, max=up_to, count=SNAPSHOT_EVENTS)
@@ -241,6 +244,7 @@ async def build_snapshot(
             "dead": counts.get("dead", 0),
         },
         "stats": stats,
+        "dead_jobs": [{"job_id": str(r["id"]), "type": r["type"]} for r in dead_rows],
         "events": [parse_event(sid, f) for sid, f in reversed(entries)],
         "last_event_id": up_to if up_to != "+" else (entries[0][0] if entries else "0-0"),
     }

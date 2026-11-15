@@ -155,3 +155,21 @@ The row lock makes two workers claiming at once take turns, so the second always
 **CORS.** The `/state` refetch is a cross-origin fetch from the dev server (WebSockets are not subject to CORS). `CORS_ORIGINS` (default `http://localhost:5173`) lists the allowed origins; Step 9 sets it to the Vercel origin.
 
 **Not in this step:** the PixiJS map, panels, and deriving goal/task state from events (the debug view shows the snapshot as of the last fetch; events only feed the log).
+
+## Step 7: the city map
+
+**Animation is driven only by the event store.** `web/src/scene.ts` is a pure model (no Pixi, no React) that changes ONLY in `sync()`, from events the store holds, and in `step(dt)`, which only advances what an event already set in motion: a worker walking to the place its event named, then home; a killed worker fading; the gate easing; a pulse decaying. Nothing starts, fails or succeeds on a timer, and a test proves it (30 simulated seconds with no events change nothing). Live mode and the recorded presets (step 8) both feed the same store, so the map cannot tell them apart.
+
+**Event to picture.** `job.started` worker turns blue and walks to Downstream; `job.succeeded` green, to Done, +1 done; `job.retry_scheduled` orange, back to the Queue, +1 queued; `job.dead` red, to the DLQ, listed with a Replay button; `worker.killed` fades; `worker.started` / first sight of a worker id spawns a sprite; `circuit.opened` swings the gate shut on the road to Downstream, `circuit.closed` reopens it; `task.awaiting_approval` shows an approval card until the task is decided. Walking back to the yard after an errand is a continuation of that event, not invented activity. If events arrive faster than the walk, the latest event wins (the worker redirects) so the picture never lags the system by an unbounded amount.
+
+**Counters come from events, corrected by snapshots.** Queue depth = snapshot value + events: `job.created`, `task.queued`, `job.retry_scheduled`, `job.replayed`, `job.reconciled`, `chaos.flood` add; `job.started` subtracts. Live testing showed jobs created by `POST /jobs` emitted no event, so the count drifted; the API now writes `job.created` in the same transaction as the job. Any snapshot (reconnect, or a gap) resets the counters, so drift cannot accumulate. Events already inside a snapshot are marked applied and not counted twice.
+
+**Performance rules.** Every sprite and Text is built once; workers are a fixed pool of 32 reused objects (more workers than that are not drawn); the ticker callback allocates nothing; Text is only touched when its string changes; the store's events are applied in one batch per frame and only when the store changed; a stalled tab's dt is capped at 0.1s. 20,000 events plus 600 frames apply in well under 1.5s in a unit test, and headless Chromium with software WebGL holds 60fps under 600 events/min (a real GPU is not needed to meet it; the real 60fps claim is a manual check, not a CI gate).
+
+**DOM for controls, canvas for the picture.** Chaos panel, DLQ replay and approval cards are real buttons over the map: keyboard and screen-reader accessible, trivially testable. The canvas is `aria-hidden`; a polite live region reads the scene as a sentence ("3 workers (2 busy) · 6 queued · ... circuit tripped"). Words follow the breaker's terms (tripped = circuit.opened), not the gate's: an early version said "circuit closed" while the gate was shut, which read backwards.
+
+**New backend surface.** `POST /dlq/{job_id}/replay` (409 if the job is not dead; shares the chaos per-IP limit), `dead_jobs` in the snapshot (so Replay works after a page load), and the `job.created` event. The failure-rate slider follows `chaos.config` events, so a change from another tab or curl moves it.
+
+**Tests.** Scene model (19), components (12), API client (5), plus a Playwright smoke test against a mock WebSocket (9) that runs in the web CI job. Verified by hand against the real backend with embedded workers: flood from the UI (CORS preflight included), real circuit trips, real dead jobs, Replay.
+
+**Not done on purpose:** Kenney isometric art (flat 2D is cheap and reads clearly), event log / task checklist / throughput panels (later), recorded presets and the live/recorded toggle (step 8).

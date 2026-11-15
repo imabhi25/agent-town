@@ -18,10 +18,11 @@
 
 ## Week 3: visual and controls
 - [x] Vite + React + TS scaffold and event store (dedupe, order, gap/reconnect refetch) in web/ (step 6)
-- [ ] React + TypeScript + PixiJS city map (queue, workers, DLQ, downstream)
-- [ ] Panels: event log, task checklist, throughput, p99, queue depth
+- [x] PixiJS city map: Planner, Queue, Workers, Downstream, DLQ, Done, circuit gate (step 7)
+- [ ] Panels: event log, task checklist, throughput, p99, queue depth (queue depth and counts are in the map summary; the rest is later)
 - [x] Cap mock_latency and only accept mock_* fields from trusted input (payload fields can currently make a worker sleep arbitrarily long)
-- [ ] Chaos panel (kill worker, failure rate, flood with mock jobs), approval gate, DLQ replay, chat panel
+- [x] Chaos panel (kill worker, failure rate, flood), approval card, DLQ replay (step 7)
+- [ ] Chat panel (prompt box) and recorded/live modes (step 8)
 - [ ] Optional: isometric art with a free asset pack (+2-3 days)
 
 ## Week 4: ship
