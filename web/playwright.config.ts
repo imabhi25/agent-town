@@ -6,6 +6,9 @@ export default defineConfig({
   testDir: "e2e",
   timeout: 30_000,
   retries: process.env.CI ? 1 : 0,
+  // One worker on CI: the map renders with software WebGL on a 2-core runner, so parallel tests
+  // starve each other (the frame-rate test and the clock-driven replay test are CPU-sensitive).
+  workers: process.env.CI ? 1 : undefined,
   use: { baseURL: "http://localhost:4173", trace: "retain-on-failure" },
   webServer: {
     command: "npm run build && npx vite preview --port 4173 --strictPort",

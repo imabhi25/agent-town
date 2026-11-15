@@ -45,6 +45,7 @@ test.describe("backend unreachable", () => {
   });
 
   test("the DLQ preset shows a dead job, then the replay succeeds", async ({ page }) => {
+    test.setTimeout(60_000); // ~540 software-rendered frames are simulated on a slow runner
     // The page clock is frozen and driven by the test, so "5.5 seconds of trace" is exact, not a
     // race against a slow machine.
     await page.clock.install({ time: new Date("2026-06-01T00:00:00Z") });
