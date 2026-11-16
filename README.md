@@ -1,70 +1,105 @@
 # Agent Town
 
-A live city map of a real distributed job engine. Type a goal, a Gemini planner breaks it into tasks, and workers ("agents") process them through Redis Streams with retries, a dead-letter queue, crash recovery and human approval gates. Every move on the map is a real event from the backend.
+A live city map of a real distributed job engine. Type a goal, a Gemini planner breaks it into a
+task graph, and workers ("agents") process it through Redis Streams with retries, a dead-letter
+queue, crash recovery and human approval gates. Every move on the map is a real event from the
+backend, and you can kill workers, break the provider and watch the system recover.
 
-> Status: week 1 (core engine) complete. See `PLAN.md`.
+**Live demo:** _add the Vercel URL here after deploying (see [docs/DEPLOY.md](docs/DEPLOY.md))._
+The site opens on a recorded trace from the real engine, so it works even while the free backend
+sleeps, and switches to live when the backend wakes.
 
-## Stack
-FastAPI + asyncio, Redis Streams, PostgreSQL, Gemini (`google-genai`), React + TypeScript + PixiJS (week 3), Docker Compose, pytest, GitHub Actions.
+<!-- TODO: demo GIF. Record the map (docs/city-map.png is a still): ![demo](docs/demo.gif) -->
+![The city map](docs/city-map.png)
 
-## Run locally
+## Architecture
+```mermaid
+flowchart LR
+  U[Browser<br/>React + PixiJS] -- POST /goals, /chaos, approve --> API
+  API[FastAPI] -- one transaction --> PG[(PostgreSQL<br/>jobs, outbox, events)]
+  PG -- outbox rows --> D[Dispatcher]
+  D -- XADD --> S[[Redis Stream: jobs]]
+  S -- consumer group --> W[Workers x N<br/>asyncio]
+  W -- claim, call, complete: one transaction --> PG
+  W -- XACK after commit --> S
+  W -- retryable error --> Z[[Redis sorted set: delayed<br/>backoff + jitter]]
+  Z -- mover --> S
+  W -- max attempts --> DLQ[[DLQ stream + status dead]]
+  PG -- events outbox --> E[Event publisher]
+  E -- XADD --> ES[[Redis Stream: events]]
+  ES --> H[WebSocket hub<br/>batched ~15/s per client]
+  H -- /ws --> U
+```
+Planner: prompt, Gemini (JSON schema, validated with Pydantic, retry once, fallback plan) or the
+mock planner, then a task DAG. A task is queued only when its dependencies succeeded; a task that
+needs approval waits for a click.
+
+## Delivery guarantee
+Redis Streams redelivers unacknowledged messages (`XAUTOCLAIM`), so a job can run more than once:
+**delivery is at-least-once, and we never claim exactly-once.** The external call (the LLM) has no
+side effects in our system, so repeating it is safe. Completion is ONE Postgres transaction: update
+the job `WHERE status != 'succeeded'`, insert the output (unique on `job_id`), check the affected
+row count, commit, and only then `XACK`. A crash between commit and `XACK` causes a redelivery, the
+guarded update matches nothing, and nothing is duplicated: the result is recorded once
+(effectively-once). Likewise a job and its outbox row, and a state change and its event, are
+written in one transaction, so the database and the queue cannot disagree.
+
+## Run it
+Backend (needs Postgres and Redis; Docker Compose provides both):
 ```bash
 cp .env.example .env
 docker compose up -d postgres redis
 pip install -e ".[dev]"
-uvicorn app.main:app --reload
-pytest
+EMBEDDED_WORKERS=true uvicorn app.main:app --reload     # API + workers in one process
+pytest && ruff check .
 ```
-
-## Architecture
-```
-POST /jobs ──▶ Postgres: jobs + outbox row (ONE transaction)
-                  │
-            dispatcher (polls outbox, XADD, then marks published)
-                  ▼
-            Redis Stream "jobs" ──▶ consumer group "workers" (N asyncio workers)
-                                         │  claim (row lock) ▶ provider call (timeout) ▶ complete (ONE transaction) ▶ XACK
-                  ┌──────────────────────┼───────────────────────────┐
-         retryable error            non-retryable error /        worker dies
-     (429/500/timeout)               max attempts reached      (no XACK, heartbeat stops)
-                  ▼                          ▼                           ▼
-   Redis sorted set "jobs:delayed"      Postgres status='dead'     XAUTOCLAIM after the lease;
-   (backoff + full jitter) ─ mover ▶    + Redis Stream "dlq"       a live worker takes the job over
-   back onto the stream                 (replay via outbox)        if the owner's heartbeat is gone
-```
-
-1. **Outbox.** The API writes the job and an outbox row in one transaction, so a job is never lost between the database and the queue.
-2. **Dispatcher.** Publishes outbox rows to the `jobs` stream (`XADD`, then marks them published). A crash in between causes a duplicate message, never a lost one.
-3. **Stream and workers.** Workers read through one consumer group. Each provider call runs under `asyncio.wait_for` (`PROVIDER_TIMEOUT`, default 30s), so a hung call becomes a retryable timeout.
-4. **Retries and DLQ.** Retryable errors wait in a Redis sorted set (exponential backoff with full jitter), so a delay never holds a worker. After `max_attempts`, or on a non-retryable error, the job is marked `dead` and added to the `dlq` stream. `replay_dlq` re-enqueues it through the outbox.
-5. **Recovery.** Every worker has a heartbeat key with a TTL. A message pending longer than the lease is taken over with `XAUTOCLAIM`, and the job is run again only if its previous owner has no heartbeat. Settings are validated at startup: `heartbeat_ttl` must be less than `lease_seconds`.
-
-Design reasoning for every step is in `DECISIONS.md`. Free-tier deployment (Vercel + Render + Neon + Upstash) is in `docs/DEPLOY.md`.
-
-## Delivery guarantee
-Redis Streams redelivers unacknowledged messages (XAUTOCLAIM), so a job can run more than once. The external call (LLM) has no side effects in our system, so repeating it is safe. Completion is one Postgres transaction: update the job `WHERE status != 'succeeded'`, insert the output (unique on job_id), check the affected row count, commit, then XACK. A crash between commit and XACK causes redelivery, the guarded update matches nothing, and nothing is duplicated. Result: effectively-once. We never claim exactly-once delivery.
-
-## Chaos demo
-`app/chaos.py` submits jobs, then repeatedly kills a random worker (preferring one that is mid-job) and starts a replacement while the jobs run. `tests/test_chaos.py` runs it in CI with 200 jobs and 4 workers and asserts: every job `succeeded`, exactly one `job_outputs` row and one `job.succeeded` event per job, and `XPENDING` is 0.
-
-Run the same scenario against the compose Postgres and Redis:
+Frontend:
 ```bash
-python scripts/demo_chaos.py --up --reset
+cd web && npm ci
+npm run dev                  # http://localhost:5173, talks to http://localhost:8000
+npm test && npm run e2e      # unit/component tests, Playwright against a mock WebSocket
 ```
-Example output (200 jobs, 4 workers, 10% mock provider errors):
+Other tools:
+```bash
+python scripts/demo_chaos.py --reset --jobs 500      # kill workers mid-job, check nothing is lost
+python scripts/record_trace.py --reset               # re-record the four preset traces (wipes the DB!)
+bench/run.sh burst 8 2000                            # k6 benchmark (wipes the DB!), see docs/benchmarks.md
+python scripts/secret_scan.py                        # the CI secret scan
 ```
-jobs submitted      200
-jobs succeeded      200
-jobs dead (DLQ)     0
-workers killed      13
-recoveries          10   (dead worker's job taken over)
-retries             22   (provider errors, backoff)
-extra attempts      32
-job_outputs rows    200   (one per job: True)
-job.succeeded       200 jobs   (exactly one each: True)
-XPENDING            0
-duration            3.9s
+The mock LLM (`app/providers/mock_llm.py`) is used for tests, CI, floods and chaos, so none of the
+above spends API quota. Real Gemini is used only for the planner and capped worker calls.
 
-RESULT: PASS (nothing lost, nothing duplicated)
-```
-`--reset` truncates the job tables and deletes the job streams first (the script refuses to run on a non-empty jobs table without it). Options: `--jobs`, `--workers`, `--failure-rate`, `--seed`.
+## Benchmarks
+One laptop (Apple M3), local Postgres and Redis, one API process with embedded workers, mock LLM
+at about 125 ms per call, k6 on the same machine. Full method and caveats: [docs/benchmarks.md](docs/benchmarks.md).
+
+| What | Result |
+|---|---|
+| Accepting jobs (`POST /jobs`), steady 600 req/s | p95 1.4 ms, p99 5.5 ms, 0 errors |
+| Accepting jobs, burst peak | 2,395 req/s, p95 50.6 ms |
+| Processing, 4 / 8 / 16 / 32 workers | 30.6 / 61.5 / 100.0 / 87.3 jobs/s |
+| Chaos, 3 runs of 500 jobs, 10% provider errors, 30 to 35 workers killed per run | 1,500/1,500 completed, one stored result and one success event per job, 0 pending |
+
+Up to 8 workers it scales to about 96% of ideal; the ceiling of one Python process is about 100
+jobs/s. These are local numbers, not numbers for the free-tier deployment.
+
+## Design decisions
+Each step's reasoning is in [DECISIONS.md](DECISIONS.md). The ones worth discussing:
+- **Transactional outbox** for jobs and for events: no job or event is lost between database and Redis; duplicates are removed by id.
+- **Retries wait in a Redis sorted set**, not in a worker, so a delay never holds a worker. Exponential backoff with full jitter.
+- **Crash recovery** by heartbeat plus `XAUTOCLAIM` after a lease; `heartbeat_ttl < lease` is validated at startup.
+- **Protection:** Lua token-bucket rate limits (per IP, per provider), circuit breaker, daily caps, a Redis command-budget guard.
+- **The map is driven only by the event store**, never by timers that invent activity; live and recorded traces feed the same store.
+- **Recorded traces come from the real engine** and are checked against what each preset claims.
+- **Found by testing, not by reading:** a worker-pool crash after every worker was killed, queue counts that drifted, and redis-py 8's 5 s socket timeout colliding with a 5 s blocking read.
+
+## Free-tier limits
+The hosted demo (Vercel, Render free, Neon free, Upstash free) is built to stay free and is
+therefore limited: the backend sleeps after idle time and takes up to a minute to wake (the site
+shows recorded traces meanwhile), live goals and Gemini calls have daily caps, the flood button is
+limited to 100 mock jobs, and live mode switches itself off when the Redis command budget is nearly
+used. Check each provider's current limits. See [docs/DEPLOY.md](docs/DEPLOY.md).
+
+## Repository map
+`app/` backend (engine, API, hub, protection) · `migrations/` SQL · `web/` React + PixiJS app and recorded traces in `web/public/traces/` ·
+`tests/` pytest · `scripts/` chaos demo, trace recorder, secret scan · `bench/` k6 benchmark · `docs/` deploy guide, benchmarks, interview notes, progress log · `PLAN.md`, `DECISIONS.md`.
