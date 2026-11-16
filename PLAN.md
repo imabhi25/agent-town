@@ -36,8 +36,8 @@
 Live URL; a prompt produces a plan and agents visibly work; kill-worker test passes in CI; benchmark numbers in README; demo works without Gemini quota (mock fallback).
 
 ## Step 11: true 3D city view (three.js)
-Status: Phase A (static scene) in progress. Phases B (behaviour) and C (performance, tests, ship)
-start only after approval.
+Status: Phase A (static scene) approved. Phase B (behaviour) built; Phase C (performance, tests, ship)
+starts only after approval.
 
 ### What the two references show (docs/reference/ref-1.png, ref-2.png)
 Both are phone screenshots of the same prototype (a town where AI sub-agents work). They are kept
@@ -95,3 +95,19 @@ and is unit tested without WebGL. The 3D view will be a second renderer of that 
 fade out, `worker.restarted` a new robot appears in the yard, `circuit.opened/closed` gate bar
 down/up, `task.awaiting_approval` a gate object that holds until approved.
 Phase A is static: four idle robots in the Workers building, no animation, no event input.
+
+### Phase B as built
+- `city3d/Town3D.tsx` owns a headless `Scene` (the same class the 2D map uses) and feeds it the
+  store's snapshot and events each frame, so 3D and 2D cannot disagree about what happened.
+- `city3d/poses.ts` (pure, no three.js) maps each Scene worker onto 3D roads: when the Scene gives a
+  worker a new destination, a route is built over the road graph in `city3d/routes.ts` (through the
+  circuit gate on the way to Downstream, around the Downstream building on the way to Done), and
+  the robot sits at the same fraction of that route as the Scene has walked of its straight line.
+  Arrival and state changes therefore stay exactly in step with the Scene.
+- Robots carry a job cube whenever they hold a job; a cube flies from the Queue to the worker on
+  `job.started`; queue, done and DLQ counts show as instanced token piles plus counters.
+- State shows on the model: one accent material per robot (visor, cap, chest light, bulb, carried
+  cube) is idle grey, busy blue, retrying orange, failed red, success green.
+- Circuit gate: a boom barrier that lowers (red) on `circuit.opened`, lifts (green) on `circuit.closed`.
+- Approval gate: an arch across the road into Done, shown only while a step awaits approval.
+- Click a robot: `onWorkerTap` kills it through the same API call as the 2D map (live mode only).
