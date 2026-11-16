@@ -14,5 +14,6 @@ Co-op portfolio project. A live city map driven by a real job engine: prompt -> 
 - One day of `PLAN.md` per task. Plan first for anything non-trivial.
 - Write tests alongside every feature; run `ruff check .` and `pytest` before finishing.
 - Small commits, one working step each.
+- NEVER push directly to `main`, not even for a one-line change. Always: branch, PR, CI green, squash-merge.
 - Record design reasoning in `DECISIONS.md`.
 - Engine first, visuals second. If time runs short, cut polish, not guarantees.
