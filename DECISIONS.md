@@ -223,3 +223,13 @@ The row lock makes two workers claiming at once take turns, so the second always
 **Honesty rules for the numbers.** Single runs, not averages; the first run's p99 includes warm-up and says so; load generator and server share the machine; no real LLM latency or network latency to the databases; `docs/INTERVIEW.md` quotes only numbers that are in `docs/benchmarks.md` and says "on my laptop". The one `consumer group missing; recreating` log line is the engine repairing itself after Redis was wiped between runs.
 
 **README.** Rewritten around: pitch, live link (placeholder until deploy), Mermaid architecture, delivery guarantee (at-least-once delivery, one stored result per job, not exactly-once), how to run, benchmark table, design decisions, free-tier limits. The demo GIF is a TODO: it needs a screen recording of the deployed site, which cannot be made from here.
+
+## Step 10b: PLANNER setting (fixed by default)
+**Why `fixed` is the public default.** The public demo should need no key, spend no quota, and look the same every visit. With `PLANNER=fixed` a goal is created from a preset id (`POST /goals {"preset": "happy-path"}`, the same four ids as the recorded traces) and the planner job returns a built-in task graph from `app/planner.py`: no Gemini client is even built, `GEMINI_API_KEY` is ignored, and worker steps use the mock provider. A free-text goal is refused with a 400 that lists the presets, before the rate limiter is touched and before any row is written.
+
+**`gemini` stays built and tested.** `PLANNER=gemini` is the earlier behaviour unchanged: Pydantic validation, one retry, then the fallback plan, and the mock planner when there is no key or the daily cap is used up. The test suite runs with `gemini` by default (an autouse fixture in `tests/conftest.py`), because most tests submit free-text goals; the fixed planner has its own tests.
+
+**The page asks, it does not assume.** `GET /config` returns `{planner, presets}` (nothing secret). The free-text box is shown only when it says `gemini`; presets always show. If `/config` cannot be reached the box stays hidden, which is the safe side.
+
+**Plan source.** A preset plan is stored with `plan_source = 'fixed'`. A planner job with no preset (queued before the switch) gets the deterministic mock plan, never an LLM.
+

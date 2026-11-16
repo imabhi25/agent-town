@@ -203,8 +203,104 @@ def build_gemini_planner(redis, api_key: str, model: str, daily_cap: int) -> Gem
     return GeminiPlanner(genai.Client(api_key=api_key), model, DailyCap(redis, daily_cap))
 
 
-async def make_plan(prompt: str, gemini: Planner | None) -> PlanResult:
-    """Pick the planner: Gemini when configured and under the daily cap, otherwise the mock."""
+# ---- fixed planner (PLANNER=fixed) -------------------------------------------------------------
+# One template per recorded preset (the same ids as web/public/traces/). Nothing here calls an LLM
+# and the plan does not depend on any free text, so the public demo is the same every time.
+
+
+def _t(id: str, name: str, description: str, deps: list[str], approval: bool = False) -> PlanTask:
+    return PlanTask(
+        id=id, name=name, description=description, depends_on=deps, needs_approval=approval
+    )
+
+
+@dataclass(frozen=True)
+class Preset:
+    id: str
+    name: str
+    goal: str  # the goal text stored for this preset
+    tasks: tuple[PlanTask, ...]
+
+
+PRESETS: dict[str, Preset] = {
+    p.id: p
+    for p in (
+        Preset(
+            "happy-path",
+            "Happy path",
+            "Plan a trip to Montreal",
+            (
+                _t("t1", "Research", "Research: Plan a trip to Montreal", []),
+                _t("t2", "Outline", "Outline the approach for: Plan a trip to Montreal", ["t1"]),
+                _t("t3", "Draft", "Write a draft for: Plan a trip to Montreal", ["t1"]),
+                _t(
+                    "t4",
+                    "Review and publish",
+                    "Combine outline and draft into the final result.",
+                    ["t2", "t3"],
+                    True,
+                ),
+            ),
+        ),
+        Preset(
+            "retries",
+            "Retries with backoff",
+            "Compare 3 laptops",
+            (
+                _t("t1", "Gather options", "List the three laptops to compare.", []),
+                _t("t2", "Compare prices", "Collect current prices for each laptop.", ["t1"]),
+                _t("t3", "Compare features", "Collect specs and reviews for each laptop.", ["t1"]),
+                _t("t4", "Score", "Score each laptop on price and features.", ["t2", "t3"]),
+                _t("t5", "Recommend", "Write the recommendation.", ["t4"], True),
+            ),
+        ),
+        Preset(
+            "chaos-recovery",
+            "Chaos recovery",
+            "Write a launch checklist",
+            (
+                _t("t1", "Collect requirements", "List what the launch needs.", []),
+                _t("t2", "Draft checklist", "Write the checklist items.", ["t1"]),
+                _t("t3", "Review risks", "List what could go wrong.", ["t1"]),
+                _t("t4", "Assign owners", "Give each item an owner.", ["t1"]),
+                _t("t5", "Publish", "Publish the final checklist.", ["t2", "t3", "t4"], True),
+            ),
+        ),
+        Preset(
+            "dlq-replay-approval",
+            "DLQ, approval and replay",
+            "Draft and publish a newsletter",
+            (
+                _t("t1", "Collect news", "Gather this month's news items.", []),
+                _t("t2", "Write", "Write the newsletter text.", ["t1"]),
+                _t("t3", "Proofread", "Fix mistakes and tighten the text.", ["t2"]),
+                _t("t4", "Publish", "Send the newsletter.", ["t3"], True),
+            ),
+        ),
+    )
+}
+PRESET_IDS = tuple(PRESETS)
+
+
+def preset_list() -> list[dict[str, str]]:
+    return [{"preset": p.id, "name": p.name} for p in PRESETS.values()]
+
+
+def fixed_plan(preset: str) -> PlanModel:
+    """The task graph for a preset id. Raises KeyError for an unknown id."""
+    return PlanModel(tasks=list(PRESETS[preset].tasks))
+
+
+async def make_plan(
+    prompt: str, gemini: Planner | None, mode: str = "gemini", preset: str | None = None
+) -> PlanResult:
+    """Pick the planner. "fixed": a preset template, never an LLM (a job without a valid preset,
+    for example one queued before the switch, gets the deterministic mock plan). "gemini": Gemini
+    when configured and under the daily cap, otherwise the mock."""
+    if mode == "fixed":
+        if preset in PRESETS:
+            return PlanResult(fixed_plan(preset), "fixed")
+        return await MockPlanner().plan(prompt)
     if gemini is not None:
         try:
             return await gemini.plan(prompt)

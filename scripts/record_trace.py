@@ -41,6 +41,10 @@ from app.retry import DELAYED_KEY, DLQ_STREAM, RetryPolicy
 from app.trace import Trace, check_trace
 from app.worker import WorkerPool
 
+# The recorder submits free-text goals, so it runs the planner that accepts them (the mock planner:
+# no key, no API spend). The public default is PLANNER=fixed.
+settings.planner = "gemini"
+
 OUT = Path(__file__).resolve().parent.parent / "web" / "public" / "traces"
 TABLES = "TRUNCATE goals, tasks, jobs, job_outputs, outbox, events RESTART IDENTITY CASCADE"
 # Slow enough to watch (workers are visibly busy for about a second), fast enough that a

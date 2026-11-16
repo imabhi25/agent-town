@@ -36,8 +36,9 @@ test.describe("backend unreachable", () => {
     await expect(summary(page)).toContainText("5 done", { timeout: 15_000 });
     await expect(page.getByRole("group", { name: "Playback" }).getByRole("button", { name: "Replay" })).toBeVisible();
 
-    // live-only controls are disabled, with the reason
-    await expect(page.getByRole("textbox")).toBeDisabled();
+    // the free-text box is hidden until /config reports planner=gemini; live-only controls are
+    // disabled, with the reason
+    await expect(page.getByRole("textbox")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Kill worker" })).toBeDisabled();
     await expect(page.getByRole("button", { name: "Live", exact: true })).toBeDisabled();
     await expect(page.getByText(/live backend is waking up/).first()).toBeVisible();
@@ -113,7 +114,7 @@ test.describe("backend unreachable", () => {
 });
 
 test.describe("backend wakes up", () => {
-  async function wake(page: Page, opts: { goals?: number } = {}) {
+  async function wake(page: Page, opts: { goals?: number; planner?: string } = {}) {
     let ws!: WebSocketRoute;
     const connected = new Promise<void>((resolve) => {
       void page.routeWebSocket(/\/ws$/, (route) => {
@@ -128,6 +129,7 @@ test.describe("backend wakes up", () => {
       await r.fulfill({ json: { status: "ok", live: true, sleeping: false } });
     });
     const posts: string[] = [];
+    await page.route("**/config", (r) => r.fulfill({ json: { planner: opts.planner ?? "gemini", presets: [] } }));
     await page.route("**/goals", async (r) => {
       posts.push(r.request().postData() ?? "");
       if (opts.goals === 429) return r.fulfill({ status: 429, json: { detail: "Daily live-goal cap reached." } });
@@ -160,6 +162,17 @@ test.describe("backend wakes up", () => {
     await expect(summary(page)).toContainText("3 workers");
     await expect(page.getByRole("textbox")).toBeDisabled();
     await page.screenshot({ path: "test-results/live-then-recorded.png" });
+  });
+
+  test("planner=fixed: the free-text box is hidden, the presets stay", async ({ page }) => {
+    const live = await wake(page, { planner: "fixed" });
+    await page.goto("/");
+    await live.connected;
+    await expect(page.getByTestId("pill")).toHaveText("Live Backend Connected");
+    await page.waitForTimeout(500); // /config has been asked by now
+    await expect(page.getByRole("button", { name: "Happy path" })).toBeVisible();
+    await expect(page.getByLabel("Your own goal")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Plan it" })).toHaveCount(0);
   });
 
   test("a typed prompt is sent; a 429 shows a friendly message", async ({ page }) => {

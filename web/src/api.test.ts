@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createApi } from "./api";
+import { createApi, parseConfig } from "./api";
 
 const reply = (status: number, body?: unknown) =>
   vi.fn().mockResolvedValue(new Response(body === undefined ? null : JSON.stringify(body), { status }));
@@ -44,5 +44,15 @@ describe("createApi", () => {
   });
   it("reports success with no message", async () => {
     expect(await createApi("http://api", reply(200, {})).startWorker()).toEqual({ ok: true, status: 200, message: "" });
+  });
+});
+
+describe("parseConfig", () => {
+  it("shows free text only for planner=gemini", () => {
+    expect(parseConfig({ planner: "gemini" }).planner).toBe("gemini");
+    expect(parseConfig({ planner: "fixed" }).planner).toBe("fixed");
+  });
+  it("treats anything unexpected as fixed (the box stays hidden)", () => {
+    for (const body of [null, {}, { planner: 3 }, "gemini", []]) expect(parseConfig(body).planner).toBe("fixed");
   });
 });
