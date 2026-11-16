@@ -9,7 +9,9 @@ export default defineConfig({
   // One worker on CI: the map renders with software WebGL on a 2-core runner, so parallel tests
   // starve each other (the frame-rate test and the clock-driven replay test are CPU-sensitive).
   workers: process.env.CI ? 1 : undefined,
-  use: { baseURL: "http://localhost:4173", trace: "retain-on-failure" },
+  // reducedMotion keeps the existing tests on the 2D map (the default view is 3D when WebGL2 works
+  // and motion is not reduced); 3D tests force it with ?view=3d.
+  use: { baseURL: "http://localhost:4173", trace: "retain-on-failure", contextOptions: { reducedMotion: "reduce" } },
   webServer: {
     command: "npm run build && npx vite preview --port 4173 --strictPort",
     url: "http://localhost:4173",

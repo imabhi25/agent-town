@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { createApi } from "./api";
 import { CityMap } from "./CityMap";
+import { defaultView, parseViewOverride, prefersReducedMotion, supportsWebGL2, type ViewMode } from "./city3d/webgl";
 import { Connection } from "./connection";
 import { Controller } from "./controller";
 import { ModeBar, PresetPicker, PromptBox, StatusPill } from "./controls";
@@ -62,8 +63,13 @@ export function App() {
     return () => ctl.dispose();
   }, [ctl]);
 
+  const webgl2 = useMemo(() => supportsWebGL2(), []);
+  const [view, setView] = useState<ViewMode>(() =>
+    defaultView({ webgl2, reducedMotion: prefersReducedMotion(), override: parseViewOverride(location.search) }),
+  );
+  const [viewNotice, setViewNotice] = useState("");
   const ui = useSyncExternalStore(ctl.subscribe, ctl.getUi);
-  const view = useSyncExternalStore(ctl.deps.store.subscribe, ctl.deps.store.getView);
+  const store = useSyncExternalStore(ctl.deps.store.subscribe, ctl.deps.store.getView);
   const actions = {
     selectPreset: (id: string) => void ctl.selectPreset(id),
     goLive: () => ctl.goLive(),
@@ -81,9 +87,17 @@ export function App() {
         <h1>Agent Town</h1>
         <StatusPill ui={ui} />
         <ModeBar ui={ui} a={actions} />
+        <div className="modebar" role="group" aria-label="View">
+          <button aria-pressed={view === "3d"} disabled={!webgl2} title={webgl2 ? undefined : "This device has no WebGL2, so only the 2D map is available."} onClick={() => setView("3d")}>
+            3D
+          </button>
+          <button aria-pressed={view === "2d"} onClick={() => setView("2d")}>
+            2D
+          </button>
+        </div>
         <span className="muted" data-testid="mode">
           {ui.mode === "live"
-            ? view.status === "open"
+            ? store.status === "open"
               ? "Showing: live"
               : "Showing: live (connecting…)"
             : "Showing: recorded trace"}
@@ -98,7 +112,19 @@ export function App() {
         <PresetPicker ui={ui} a={actions} />
         <PromptBox ui={ui} a={actions} />
       </div>
-      <CityMap state={view} api={api} off={ui.liveOffReason} notify={(r) => ctl.report(r)} />
+      {viewNotice && (
+        <p className="notice" role="status" data-testid="view-notice">
+          {viewNotice}
+        </p>
+      )}
+      <CityMap
+        view={view}
+        onViewFail={(why) => {
+          setViewNotice(why);
+          setView("2d");
+        }}
+        state={store}
+        api={api} off={ui.liveOffReason} notify={(r) => ctl.report(r)} />
     </main>
   );
 }

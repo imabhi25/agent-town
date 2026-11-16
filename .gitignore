@@ -11,3 +11,4 @@ dist/
 dump.rdb
 test-results/
 playwright-report/
+docs/reference/
