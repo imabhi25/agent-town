@@ -1,12 +1,32 @@
-import { useEffect, useRef, useState } from "react";
+import { Component, lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import type { Api, ApiResult } from "./api";
 import { ApprovalCards, ChaosPanel, DeadLetters, Legend } from "./components";
+import type { ViewMode } from "./city3d/webgl";
 import { CityRenderer } from "./renderer";
-import type { DeadJob, PendingApproval, SceneSummary } from "./scene";
+import type { DeadJob, PendingApproval, Scene, SceneSummary } from "./scene";
 import type { StoreState } from "./store";
+
+// three.js is a separate chunk: it is downloaded only when the 3D view is first shown.
+const Scene3D = lazy(() => import("./city3d/Scene3D"));
+
+/** If the 3D chunk fails to load or the scene throws, tell the page so it can show the 2D map. */
+class Boundary3D extends Component<{ onFail: (why: string) => void; children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  componentDidCatch(e: Error) {
+    this.props.onFail(`The 3D view could not start (${e.message}). Showing the 2D map.`);
+  }
+  render() {
+    return this.state.failed ? null : this.props.children;
+  }
+}
 
 interface Props {
   state: StoreState;
+  view?: ViewMode;
+  onViewFail?: (why: string) => void;
   api: Api;
   floodMax?: number;
   off?: string; // why the live controls are disabled ("" = enabled)
@@ -35,7 +55,7 @@ declare global {
   }
 }
 
-export function CityMap({ state, api, floodMax = 100, off = "", notify: report }: Props) {
+export function CityMap({ state, api, view = "2d", onViewFail, floodMax = 100, off = "", notify: report }: Props) {
   const host = useRef<HTMLDivElement>(null);
   const stateRef = useRef(state);
   stateRef.current = state; // the renderer reads the latest store state each frame
@@ -48,20 +68,20 @@ export function CityMap({ state, api, floodMax = 100, off = "", notify: report }
 
   const notify = (r: ApiResult) => (report ? report(r) : setNotice(r.ok ? "" : r.message));
 
+  // Both views own a Scene; the DOM panels (legend, chaos, DLQ, approvals) read it the same way.
+  const showOverlay = (sc: Scene) =>
+    setOverlay({
+      summary: sc.summary(),
+      deadJobs: [...sc.deadJobs],
+      approvals: [...sc.approvals],
+      workerIds: sc.pool.filter((w) => w.active && w.dying === 0).map((w) => w.id).sort(),
+      failureRate: sc.failureRate,
+    });
   useEffect(() => {
-    if (!host.current) return;
+    if (view !== "2d" || !host.current) return;
     const renderer = new CityRenderer(host.current, {
       getState: () => stateRef.current,
-      onChange: () => {
-        const sc = renderer.scene;
-        setOverlay({
-          summary: sc.summary(),
-          deadJobs: [...sc.deadJobs],
-          approvals: [...sc.approvals],
-          workerIds: sc.pool.filter((w) => w.active && w.dying === 0).map((w) => w.id).sort(),
-          failureRate: sc.failureRate,
-        });
-      },
+      onChange: () => showOverlay(renderer.scene),
       onWorkerTap: (id) => {
         if (!offRef.current) void apiRef.current.killWorker(id).then(notify); // not on a recording
       },
@@ -77,15 +97,25 @@ export function CityMap({ state, api, floodMax = 100, off = "", notify: report }
       renderer.destroy();
       delete window.__town;
     };
-  }, []);
+  }, [view]);
 
   return (
     <div className="town">
       <div className="map-wrap">
-        <div className="map" ref={host} data-testid="map" />
+        {view === "2d" ? (
+          <div className="map" ref={host} data-testid="map" />
+        ) : (
+          <div className="map map3d" data-testid="map3d">
+            <Boundary3D onFail={(why) => onViewFail?.(why)}>
+              <Suspense fallback={<p className="muted loading3d">Loading the 3D city…</p>}>
+                <Scene3D />
+              </Suspense>
+            </Boundary3D>
+          </div>
+        )}
         <ApprovalCards approvals={overlay.approvals} api={api} notify={notify} off={off} />
       </div>
-      <Legend summary={overlay.summary} />
+      {view === "2d" && <Legend summary={overlay.summary} />}
       {notice && (
         <p className="notice" role="alert">
           {notice}
