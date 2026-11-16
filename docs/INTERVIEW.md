@@ -1,7 +1,8 @@
 # Interview notes
 
-Every number below is from `docs/benchmarks.md` (local laptop, single process, mock LLM at about
-125 ms per call). Say "on my laptop" when you quote them.
+Every number below is from `docs/benchmarks.md`: a single run, on one Apple M3 laptop, k6 on the same
+machine, one Python process, mock LLM at about 125 ms per call. They are not free-tier numbers. Say
+"on my laptop, single run" when you quote them.
 
 ## Resume bullets (pick 3 to 4)
 1. Built a distributed job engine (FastAPI, asyncio, Redis Streams, PostgreSQL) with a transactional
@@ -26,7 +27,7 @@ tasks, and workers pick them up through Redis Streams while the map shows every 
 The core problem is not losing or duplicating work. A job and its outbox row are written in one
 Postgres transaction, a dispatcher publishes them to a stream, and workers complete a job in one
 transaction before they acknowledge. Delivery is at-least-once, so completion is idempotent:
-I do not claim exactly-once. To check that, I ran 500 jobs with 4 workers, killed a worker every
+Delivery is not exactly-once. To check the result, I ran 500 jobs with 4 workers, killed a worker every
 few tenths of a second, and made 10% of calls fail. Across three runs about 30 workers were killed
 each time, and every one of the 1,500 jobs finished with exactly one stored result.
 
@@ -40,9 +41,9 @@ backend in the background, and switches to live when it answers. Rate limits, a 
 daily caps keep it inside the free limits."
 
 ## Questions to be ready for
-- *Why not exactly-once?* Redis Streams redelivers unacknowledged messages, and a crash can happen
-  between commit and XACK. The guarded update makes the second run a no-op. That is effectively-once
-  for our state; the external call may repeat.
+- *Is delivery exactly-once?* Redis Streams redelivers unacknowledged messages, and a crash can happen
+  between commit and XACK. The guarded update makes the second run a no-op. The result is one stored
+  row per job; the external call may repeat.
 - *Where is the ceiling and why?* One event loop: API, publisher and workers share it, and each
   completion is a Postgres transaction. 4 and 8 workers reach about 96% of ideal; 16 reach 78%; 32 get worse.
 - *What would you change for real scale?* Workers as separate processes or services, batching event

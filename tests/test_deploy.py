@@ -1,6 +1,8 @@
 """Deployment safety: hosted-database pool settings, migrations on an empty database, the
 live-demo configuration checks and the WebSocket origin check."""
 
+import re
+from pathlib import Path
 from urllib.parse import urlparse
 
 import asyncpg
@@ -11,6 +13,8 @@ from starlette.websockets import WebSocketDisconnect
 from app.config import Settings, production_problems, settings
 from app.db import is_pooled, pool_kwargs
 from app.migrate import MIGRATIONS, UnmanagedDatabase, migrate
+
+ROOT = Path(__file__).resolve().parent.parent
 
 # ---- pool settings for Neon ----
 
@@ -213,3 +217,33 @@ async def test_a_5s_blocking_read_does_not_time_out(redis):
     finally:
         await r.delete("s9-test-stream")
         await r.aclose()
+
+
+# ---- the deploy checklist cannot silently drift ----
+
+
+def _env_example_names() -> set[str]:
+    """Variable names in .env.example, commented-out lines included (they document the deploy)."""
+    names = set()
+    for line in (ROOT / ".env.example").read_text().splitlines():
+        line = line.lstrip("# ").strip()
+        if "=" in line and line.split("=")[0].isupper():
+            names.add(line.split("=")[0])
+    return names
+
+
+def test_env_example_lists_every_variable_render_needs():
+    render_keys = set(re.findall(r"- key: (\w+)", (ROOT / "render.yaml").read_text()))
+    assert render_keys, "render.yaml should list env vars"
+    assert render_keys <= _env_example_names(), render_keys - _env_example_names()
+    assert {"DATABASE_URL", "REDIS_URL", "GEMINI_API_KEY", "LIVE_DEMO", "CORS_ORIGINS"} <= (
+        _env_example_names()
+    )
+
+
+def test_the_browser_bundle_source_never_reads_an_api_key():
+    # Only VITE_* variables reach the browser, and the only one is the backend URL.
+    for path in (ROOT / "web" / "src").rglob("*"):
+        if path.suffix in {".ts", ".tsx"}:
+            assert "API_KEY" not in path.read_text().upper(), path
+    assert (ROOT / "web" / ".env.example").read_text().count("=") == 1

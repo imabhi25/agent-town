@@ -1,6 +1,7 @@
 # Benchmarks
 
-Everything here was measured on one laptop against the LOCAL stack, not the free-tier deployment.
+Everything here is a single run (one run per row) on one Apple M3 laptop against the LOCAL stack, with
+k6 on the same machine and a mock LLM at about 125 ms per call. These are not free-tier numbers.
 The free tiers (a shared Render CPU, Neon, Upstash over the internet) are slower and capped, so do
 not read these as numbers for the hosted demo.
 
@@ -71,8 +72,8 @@ to 0.4 s a random worker (preferably one in the middle of a job) is killed and r
 | 3 | 30 | 27 | 50 | 500/500 | 500 | exactly 1 | 0 | 8.3 s |
 
 Delivery is at-least-once (a taken-over job can run its provider call again); completion is one
-transaction guarded by `WHERE status != 'succeeded'`, so the result is recorded once: effectively-once, not
-exactly-once. In every benchmark run above, `job_outputs` had one row per job and there was one
+transaction guarded by `WHERE status != 'succeeded'`, so the result is recorded once: at-least-once delivery plus
+idempotent completion gives one stored result per job (delivery is not exactly-once). In every benchmark run above, `job_outputs` had one row per job and there was one
 `job.succeeded` event per succeeded job.
 
 ## What these numbers do not show

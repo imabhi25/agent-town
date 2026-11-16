@@ -14,3 +14,4 @@
 | 8. Recorded presets and live mode | [#12](https://github.com/imabhi25/agent-town/pull/12) | pass | 163 py, 103 js, 19 e2e | Traces recorded from the real engine, replay, /healthz ping |
 | 9. Free deployment files and guide | [#13](https://github.com/imabhi25/agent-town/pull/13) | pass | 204 py, 103 js, 19 e2e | Dockerfile, render.yaml, vercel.json, migrations at startup, CORS lock, secret scan |
 | 10. Benchmark, README, interview notes | [#14](https://github.com/imabhi25/agent-town/pull/14) | pass | 204 py, 103 js, 19 e2e | k6 vs local stack, docs/benchmarks.md, docs/INTERVIEW.md |
+| Pre-deploy verification | (this PR) | see PR | 206 py, 103 js | Wording audit, clean-clone run, secrets audit, env.example completed, branch-only rule |

@@ -36,12 +36,12 @@ needs approval waits for a click.
 
 ## Delivery guarantee
 Redis Streams redelivers unacknowledged messages (`XAUTOCLAIM`), so a job can run more than once:
-**delivery is at-least-once, and we never claim exactly-once.** The external call (the LLM) has no
+**delivery is at-least-once, not exactly-once.** The external call (the LLM) has no
 side effects in our system, so repeating it is safe. Completion is ONE Postgres transaction: update
 the job `WHERE status != 'succeeded'`, insert the output (unique on `job_id`), check the affected
 row count, commit, and only then `XACK`. A crash between commit and `XACK` causes a redelivery, the
-guarded update matches nothing, and nothing is duplicated: the result is recorded once
-(effectively-once). Likewise a job and its outbox row, and a state change and its event, are
+guarded update matches nothing, and nothing is duplicated: at-least-once delivery plus idempotent
+completion in one Postgres transaction gives one stored result per job. Likewise a job and its outbox row, and a state change and its event, are
 written in one transaction, so the database and the queue cannot disagree.
 
 ## Run it
@@ -61,7 +61,7 @@ npm test && npm run e2e      # unit/component tests, Playwright against a mock W
 ```
 Other tools:
 ```bash
-python scripts/demo_chaos.py --reset --jobs 500      # kill workers mid-job, check nothing is lost
+python scripts/demo_chaos.py --reset --jobs 500      # kill workers mid-job, check every job ends with one stored result
 python scripts/record_trace.py --reset               # re-record the four preset traces (wipes the DB!)
 bench/run.sh burst 8 2000                            # k6 benchmark (wipes the DB!), see docs/benchmarks.md
 python scripts/secret_scan.py                        # the CI secret scan
@@ -70,22 +70,22 @@ The mock LLM (`app/providers/mock_llm.py`) is used for tests, CI, floods and cha
 above spends API quota. Real Gemini is used only for the planner and capped worker calls.
 
 ## Benchmarks
-One laptop (Apple M3), local Postgres and Redis, one API process with embedded workers, mock LLM
-at about 125 ms per call, k6 on the same machine. Full method and caveats: [docs/benchmarks.md](docs/benchmarks.md).
+Single run per row, on one Apple M3 laptop, local Postgres and Redis, one API process with embedded
+workers, mock LLM at about 125 ms per call, k6 on the same machine. Full method and caveats: [docs/benchmarks.md](docs/benchmarks.md).
 
 | What | Result |
 |---|---|
 | Accepting jobs (`POST /jobs`), steady 600 req/s | p95 1.4 ms, p99 5.5 ms, 0 errors |
 | Accepting jobs, burst peak | 2,395 req/s, p95 50.6 ms |
 | Processing, 4 / 8 / 16 / 32 workers | 30.6 / 61.5 / 100.0 / 87.3 jobs/s |
-| Chaos, 3 runs of 500 jobs, 10% provider errors, 30 to 35 workers killed per run | 1,500/1,500 completed, one stored result and one success event per job, 0 pending |
+| Chaos, 3 runs of 500 jobs, 10% provider errors, 30 to 35 workers killed per run | 1,500/1,500 completed, one stored result and one success event per job, 0 pending (single run of each seed) |
 
 Up to 8 workers it scales to about 96% of ideal; the ceiling of one Python process is about 100
-jobs/s. These are local numbers, not numbers for the free-tier deployment.
+jobs/s. These are single-run local numbers, not numbers for the free-tier deployment.
 
 ## Design decisions
 Each step's reasoning is in [DECISIONS.md](DECISIONS.md). The ones worth discussing:
-- **Transactional outbox** for jobs and for events: no job or event is lost between database and Redis; duplicates are removed by id.
+- **Transactional outbox** for jobs and for events: a job or event is written in the same transaction as its state change, so the database and Redis cannot disagree; duplicates are removed by id.
 - **Retries wait in a Redis sorted set**, not in a worker, so a delay never holds a worker. Exponential backoff with full jitter.
 - **Crash recovery** by heartbeat plus `XAUTOCLAIM` after a lease; `heartbeat_ttl < lease` is validated at startup.
 - **Protection:** Lua token-bucket rate limits (per IP, per provider), circuit breaker, daily caps, a Redis command-budget guard.
