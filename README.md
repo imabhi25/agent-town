@@ -103,3 +103,9 @@ used. Check each provider's current limits. See [docs/DEPLOY.md](docs/DEPLOY.md)
 ## Repository map
 `app/` backend (engine, API, hub, protection) · `migrations/` SQL · `web/` React + PixiJS app and recorded traces in `web/public/traces/` ·
 `tests/` pytest · `scripts/` chaos demo, trace recorder, secret scan · `bench/` k6 benchmark · `docs/` deploy guide, benchmarks, interview notes, progress log · `PLAN.md`, `DECISIONS.md`.
+
+## Credits
+The 3D view (Step 11) is built with [three.js](https://threejs.org) (MIT), react-three-fiber and
+drei (MIT). Every building, tree, road and robot in it is generated from three.js primitives, so
+no third-party 3D model files are shipped yet. If CC0 packs are added later (Kenney City Kit,
+Quaternius robots), they will be listed here even though CC0 needs no attribution.
