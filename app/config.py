@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -7,6 +9,10 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql://agent:agent@localhost:5432/agent_town"
     redis_url: str = "redis://localhost:6379/0"
+    # Who plans a goal. "fixed" (the public default): a built-in task graph chosen from a preset id,
+    # no LLM, no API key, no quota, the same demo every time. "gemini": the real planner (validated,
+    # retried once, fallback plan) when a key is set, else the mock planner.
+    planner: Literal["fixed", "gemini"] = "fixed"
     gemini_api_key: str = ""
     gemini_model: str = "gemini-2.5-flash"
     # Hard daily limit on real Gemini calls (counted in Redis). Over it, the mock planner is used.

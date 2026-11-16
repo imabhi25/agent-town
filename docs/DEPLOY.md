@@ -28,10 +28,11 @@ Set these on **Render** (dashboard, or `render.yaml` + Blueprint). Secrets are `
 | `LIVE_DEMO` | `true` | no | Embedded workers, 2 quiet workers, caps, flood limit 100, sleep when idle |
 | `AUTO_MIGRATE` | `true` | no | Neon starts empty; the app applies `migrations/*.sql` at startup |
 | `TRUST_FORWARDED_FOR` | `true` | no | Render's proxy sets `X-Forwarded-For`; without it every visitor shares one per-IP limit |
+| `PLANNER` | `fixed` | no | Presets only: a built-in task graph, no LLM. Free-text goals get a 400 and the web app hides the box. Use `gemini` only if you want the real planner |
 | `DATABASE_URL` | Neon **direct** string ending `?sslmode=require` | **yes** | See "Neon" |
 | `REDIS_URL` | Upstash `rediss://default:PASSWORD@HOST:6379` | **yes** | `rediss` = TLS |
 | `CORS_ORIGINS` | `https://YOUR-SITE.vercel.app` (no trailing slash) | no | Only your site may call the API or open the WebSocket |
-| `GEMINI_API_KEY` | your key, or leave empty | **yes** | Empty = mock planner only. Server-side only, never in the web app |
+| `GEMINI_API_KEY` | leave empty with `PLANNER=fixed` | **yes** | Not needed (and ignored) when `PLANNER=fixed`. With `PLANNER=gemini`: empty = mock planner only. Server-side only, never in the web app |
 | `GEMINI_DAILY_CAP` | `50` | no | Hard daily cap on real Gemini calls; over it, the mock planner runs |
 | `LIVE_GOALS_DAILY_CAP` | `30` | no | Live goals per UTC day across everyone; over it the API answers 429 |
 

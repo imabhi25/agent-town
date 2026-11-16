@@ -298,7 +298,13 @@ async def handle_message(
         # process is alive).
         if fields.get("type") == "planner":
             result = await asyncio.wait_for(
-                make_plan(payload.get("prompt", ""), planner), timeout=provider_timeout
+                make_plan(
+                    payload.get("prompt", ""),
+                    planner,
+                    settings.planner,
+                    payload.get("preset"),
+                ),
+                timeout=provider_timeout,
             )
             output = {"source": result.source, "tasks": [t.model_dump() for t in result.plan.tasks]}
             goal_id = UUID(payload["goal_id"])
@@ -609,12 +615,12 @@ def build_worker_pool(
     provider rate limit on, and the live-demo profile's back-off when LIVE_DEMO is set."""
     from app.providers.gemini_llm import build_provider
 
+    # PLANNER=fixed means no Gemini anywhere: no client is built, so no key is needed or used.
+    api_key = settings.gemini_api_key if settings.planner == "gemini" else ""
     planner = build_gemini_planner(
-        redis, settings.gemini_api_key, settings.gemini_model, settings.gemini_daily_cap
+        redis, api_key, settings.gemini_model, settings.gemini_daily_cap
     )  # None without a key: the mock planner is used
-    provider = build_provider(
-        redis, settings.gemini_api_key, settings.gemini_model, settings.gemini_daily_cap
-    )
+    provider = build_provider(redis, api_key, settings.gemini_model, settings.gemini_daily_cap)
     return WorkerPool(
         pool,
         redis,

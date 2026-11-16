@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useSyncExternalStore } from "react";
-import { createApi } from "./api";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { createApi, parseConfig, type PublicConfig } from "./api";
 import { CityMap } from "./CityMap";
 import { Connection } from "./connection";
 import { Controller } from "./controller";
@@ -62,7 +62,19 @@ export function App() {
     return () => ctl.dispose();
   }, [ctl]);
 
+  // Which planner the backend runs. Unknown until it answers; the free-text box needs "gemini".
+  const [config, setConfig] = useState<PublicConfig | null>(null);
   const ui = useSyncExternalStore(ctl.subscribe, ctl.getUi);
+  useEffect(() => {
+    if (ui.health !== "connected" || config) return;
+    let live = true;
+    getJson<unknown>(`${API_URL}/config`, 10_000)
+      .then((b) => live && setConfig(parseConfig(b)))
+      .catch(() => undefined); // stays hidden; asked again if the connection state changes
+    return () => {
+      live = false;
+    };
+  }, [ui.health, config]);
   const view = useSyncExternalStore(ctl.deps.store.subscribe, ctl.deps.store.getView);
   const actions = {
     selectPreset: (id: string) => void ctl.selectPreset(id),
@@ -96,7 +108,7 @@ export function App() {
       )}
       <div className="panels top">
         <PresetPicker ui={ui} a={actions} />
-        <PromptBox ui={ui} a={actions} />
+        {config?.planner === "gemini" && <PromptBox ui={ui} a={actions} />}
       </div>
       <CityMap state={view} api={api} off={ui.liveOffReason} notify={(r) => ctl.report(r)} />
     </main>

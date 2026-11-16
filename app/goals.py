@@ -13,7 +13,7 @@ def planner_idempotency_key(goal_id: UUID) -> str:
     return f"planner:{goal_id}"
 
 
-async def create_goal(conn: asyncpg.Connection, prompt: str) -> UUID:
+async def create_goal(conn: asyncpg.Connection, prompt: str, preset: str | None = None) -> UUID:
     """Goal + its planner job + outbox row + goal.created, all in the caller's transaction."""
     goal_id = await conn.fetchval("INSERT INTO goals (prompt) VALUES ($1) RETURNING id", prompt)
     job_id = await conn.fetchval(
@@ -21,7 +21,9 @@ async def create_goal(conn: asyncpg.Connection, prompt: str) -> UUID:
         INSERT INTO jobs (type, payload, idempotency_key, max_attempts)
         VALUES ('planner', $1::jsonb, $2, 3) RETURNING id
         """,
-        json.dumps({"goal_id": str(goal_id), "prompt": prompt}),
+        json.dumps(
+            {"goal_id": str(goal_id), "prompt": prompt, **({"preset": preset} if preset else {})}
+        ),
         planner_idempotency_key(goal_id),
     )
     await conn.execute("INSERT INTO outbox (job_id) VALUES ($1)", job_id)
