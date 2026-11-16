@@ -25,26 +25,8 @@ export const PLOTS: Plot[] = Object.values(BUILDINGS).map((b) => ({
 }));
 export const plot = (id: Building["id"]) => PLOTS.find((p) => p.id === id)!;
 
-// Paths between buildings, as axis-aligned segments [x1, z1, x2, z2].
-const P = (id: Building["id"]) => plot(id);
-export const ROADS: [number, number, number, number][] = [
-  [P("planner").x, P("planner").z, P("queue").x, P("queue").z],
-  [P("queue").x, P("queue").z, P("yard").x - P("yard").w / 2, P("queue").z],
-  [P("yard").x + P("yard").w / 2, -1.25, P("downstream").x, -1.25],
-  [P("downstream").x, P("downstream").z, P("done").x, P("done").z],
-  [P("yard").x, P("yard").z, P("dlq").x, P("dlq").z],
-];
-
 // Where the circuit-breaker gate will stand (Phase B): on the road from the yard to Downstream.
 export const GATE_POS: [number, number] = [4.4, -1.25];
-
-// Idle robot slots inside the Workers building (the 2D yard has 4 slots by default).
-export const ROBOT_SLOTS: [number, number][] = [
-  [-2.2, -0.5],
-  [-0.9, 0.9],
-  [0.6, -0.4],
-  [1.8, 1.0],
-];
 
 // Hand-placed trees around the slab edge and between districts. [x, z, scale, colour index]
 export const TREES: [number, number, number, number][] = [

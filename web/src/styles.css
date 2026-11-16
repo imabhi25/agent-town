@@ -116,3 +116,7 @@ button:disabled:hover { background: #fff; }
   font-size: 12px; line-height: 1.25; box-shadow: 0 2px 8px rgb(74 68 88 / 0.18); pointer-events: none;
 }
 .label3d span { font-size: 10px; opacity: 0.7; }
+.label3d.small { font-size: 11px; padding: 2px 8px; }
+.label3d .count3d { font-size: 11px; font-weight: 600; }
+.label3d .count3d:empty { display: none; }
+.label3d.small:has(> span:empty) { display: none; }

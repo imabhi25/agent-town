@@ -1,18 +1,23 @@
-// The 3D city (Phase A: static). A real three.js scene: perspective camera, hemisphere + sun
+// The 3D city. A real three.js scene: perspective camera, hemisphere + sun
 // light, soft shadow maps, low-poly meshes. It is lazy-loaded (see CityMap) so three.js is not part
-// of the first paint. Phase A reads no events: four idle robots stand in the Workers building.
+// of the first paint. It reads the same event store as the 2D map (through Town3D).
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import { useRef } from "react";
 import * as THREE from "three";
 import { PALETTE } from "../palette";
-import { Buildings } from "./Buildings";
+import { Town3D, type TownHooks } from "./Town3D";
 import { SLAB } from "./layout";
 import { Box, Roads, Trees, hex } from "./parts";
 
 declare global {
   interface Window {
-    __town3d?: { fps: number; frames: number };
+    __town3d?: {
+      fps: number;
+      frames: number;
+      summary?: () => unknown;
+      workerScreen?: (id: string) => { x: number; y: number } | null; // for tests: where a robot is on screen
+    };
   }
 }
 
@@ -63,13 +68,13 @@ function Controls() {
   );
 }
 
-export default function Scene3D() {
+export default function Scene3D({ hooks }: { hooks: TownHooks }) {
   return (
     <Canvas
       shadows="soft"
       flat // no tone mapping: pastel colours stay as authored
       dpr={[1, 2]} // never more than 2x pixel density
-      camera={{ fov: 32, near: 0.5, far: 120, position: [0, 19, 22.5] }}
+      camera={{ fov: 32, near: 0.5, far: 120, position: [0, 17.5, 21] }}
       gl={{ antialias: true, powerPreference: "high-performance" }}
       data-testid="canvas3d"
     >
@@ -95,7 +100,7 @@ export default function Scene3D() {
       <Box p={[0, -0.55, 0]} s={[SLAB.w + 0.8, 0.5, SLAB.d + 0.8]} c="#c9c1cf" />
       <Box p={[0, -0.15, 0]} s={[SLAB.w, 0.3, SLAB.d]} c="#efe8da" cast={false} />
       <Roads />
-      <Buildings />
+      <Town3D hooks={hooks} />
       <Trees />
       <Controls />
       <FpsProbe />
