@@ -233,3 +233,16 @@ The row lock makes two workers claiming at once take turns, so the second always
 
 **Plan source.** A preset plan is stored with `plan_source = 'fixed'`. A planner job with no preset (queued before the switch) gets the deterministic mock plan, never an LLM.
 
+## Step 11: the 3D "build the town" view
+**Why three.js, and a real 3D scene.** A perspective camera, lights and shadows give the depth the 2D map cannot; the 2D PixiJS map stays as the fallback (no WebGL2, reduced motion, a failed chunk). three.js is a separate lazily loaded chunk, so first paint does not pay for it.
+
+**Why the scene reads only the event store.** Recorded traces and the live WebSocket already go through one store (deduped by id, ordered), so feeding the 3D view from it means a recording and a live run can never look different, and nothing animates unless an event said so.
+
+**Zones are DAG stages.** Tasks carry no kind or group, and adding one would mean changing the engine and re-recording the traces. A task's stage (1 + the deepest stage among its dependencies) is already in `task.created.depends_on`, works for every recorded trace, and gives the plan a natural left-to-right-around-the-ring reading. More than 6 stages merge into the last zone.
+
+**The layout is data.** `docs/reference/town-layout.json` is written by a seeded script and read by the app and its tests: zones, 8 slots each, roads as spline centrelines, the path graph, barriers and props. Tests check no overlaps, every slot reachable from the plaza, one non-crossing main ring, props off the roads, the decoration triangle budget, and that every preset and recorded trace fits.
+
+**Static geometry is merged, repeated things are instanced.** Roads, plaza, foundations, robots and lamps are one mesh with vertex colours; trees, bushes, rocks, flowers, fences and road arrows are InstancedMeshes. Phase A draws in 40 calls and 14k triangles against budgets of 150 and 56k.
+
+**The camera fits the board, not a fixed number.** The default distance is found by projecting the board's corners through the real camera so the widest part takes 85% of the width; it is recomputed on resize and the zoom limits are relative to it.
+
