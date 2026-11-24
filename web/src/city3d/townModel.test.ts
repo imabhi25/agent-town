@@ -1,10 +1,14 @@
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { initialState, reduce } from "../store";
 import type { TownEvent, Trace } from "../types";
+import happy from "../../public/traces/happy-path.json";
+import retries from "../../public/traces/retries.json";
+import chaos from "../../public/traces/chaos-recovery.json";
+import dlq from "../../public/traces/dlq-replay-approval.json";
 import { deriveTown, stagesOf } from "./townModel";
 
-const trace = (name: string): Trace => JSON.parse(readFileSync(`public/traces/${name}.json`, "utf8"));
+const TRACES: Record<string, unknown> = { "happy-path": happy, retries, "chaos-recovery": chaos, "dlq-replay-approval": dlq };
+const trace = (name: string) => TRACES[name] as Trace; // JSON imports (no node:fs: CI has no Node types)
 
 let nextId = 1;
 const ev = (type: string, payload: Record<string, unknown>, ts = "2026-01-01T00:00:00Z"): TownEvent => ({
