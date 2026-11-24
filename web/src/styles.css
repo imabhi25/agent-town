@@ -122,3 +122,12 @@ button:disabled:hover { background: #fff; }
 .label3d.small:has(> span:empty) { display: none; }
 .label3d.zone { flex-direction: row; align-items: center; gap: 6px; }
 .label3d .badge { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; font-size: 11px; color: #4a4458; }
+
+.pipeline .banner { margin: 0 0 8px; padding: 6px 10px; border-radius: 8px; background: #e3f5e8; color: #2f6b45; font-weight: 600; }
+.pipeline .stages { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.pipeline .stage-head { display: flex; gap: 8px; align-items: center; }
+.pipeline .stages ul { list-style: none; margin: 4px 0 0 28px; padding: 0; font-size: 0.9rem; }
+.pipeline .task em { font-style: normal; opacity: 0.7; }
+.pipeline .task.retrying em { color: #b9651c; }
+.pipeline .task.dead em { color: #b8323f; }
+.pipeline .task.succeeded em { color: #2f6b45; }

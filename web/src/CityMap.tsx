@@ -6,6 +6,7 @@ import { CityRenderer } from "./renderer";
 import { Scene, type DeadJob, type PendingApproval, type SceneSummary } from "./scene";
 import type { StoreState } from "./store";
 import { deriveTown } from "./city3d/townModel";
+import { PipelinePanel } from "./city3d/PipelinePanel";
 
 // three.js is a separate chunk: it is downloaded only when the 3D view is first shown.
 const Scene3D = lazy(() => import("./city3d/Scene3D"));
@@ -146,6 +147,7 @@ export function CityMap({ state, api, view = "2d", onViewFail, floodMax = 100, o
           {notice}
         </p>
       )}
+      {view === "3d" && <PipelinePanel model={model} />}
       <div className="panels">
         <ChaosPanel
           api={api}

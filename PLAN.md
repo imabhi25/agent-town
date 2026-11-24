@@ -146,11 +146,16 @@ rubble with a red beacon, approval label), robots and zone counters, and the bar
 circuit. `Scene3D` takes the model; with no model it still shows the Phase A preview.
 Correction to the notes above: `task.created.depends_on` holds task **ids**, not keys (checked against
 the recorded traces), so stages are computed over ids.
-Not done yet: Foreman turning toward the latest event, completion banner and sequence, pipeline panel
-and legend, snap-when-behind for replay at 4x (walkers only hurry), Playwright e2e.
+Not done yet: Foreman turning toward the latest event (the Foreman is still baked into the static
+batch), snap-when-behind for replay at 4x (walkers only hurry), Playwright e2e.
 
 Slice 2 (done): in 3D a headless `Scene` (same event rules as 2D) feeds the DOM panels, so approval
 cards, dead letters, the worker list and the legend work in both views; clicking a robot kills that
 worker (refused while a recording plays, as in 2D). Bug found and fixed on the way (it also hit 2D):
 restarting a recording replayed the same event ids, which the scene skipped as already applied. The
 store now has an `epoch` that `reset()` bumps, and `Scene.sync` starts over when it changes.
+
+Slice 3 (done): `PipelinePanel` (DOM, under the map in 3D) lists each stage with its tasks and state,
+and shows a completion banner "Town built in 10.4s: 4 tasks, 7 retries" from `goal.started` and
+`goal.succeeded` timestamps; a "Town built!" flag appears over the Foreman. The model now counts
+retries. No celebration animation: it would not come from any event, so it was left out.

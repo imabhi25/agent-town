@@ -175,6 +175,11 @@ export function TownLive({ model, onWorkerTap }: { model: TownModel; onWorkerTap
       {workers.map((w, i) => (
         <Worker key={w.id} view={w} model={model} order={i} onTap={onWorkerTap} />
       ))}
+      {model.goalStatus === "succeeded" && (
+        <Html position={[LAYOUT.plaza.foreman[0], 4.4, LAYOUT.plaza.foreman[1]]} center zIndexRange={[10, 0]} className="label3d small done">
+          <strong>Town built!</strong>
+        </Html>
+      )}
       {model.zones.map((z) => {
         const spec = LAYOUT.zones[z.zone - 1];
         const names = model.tasks.filter((t) => t.zone === z.zone).map((t) => t.name);

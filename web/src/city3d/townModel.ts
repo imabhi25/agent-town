@@ -55,11 +55,12 @@ export interface TownModel {
   workers: WorkerView[];
   circuitOpen: boolean; // llm circuit: every barrier lowers
   deadJobs: number;
+  retries: number; // job.retry_scheduled events for this goal's tasks
 }
 
 export const EMPTY_MODEL: TownModel = {
   goalId: null, goalStatus: "none", startedMs: null, finishedMs: null,
-  tasks: [], zones: [], workers: [], circuitOpen: false, deadJobs: 0,
+  tasks: [], zones: [], workers: [], circuitOpen: false, deadJobs: 0, retries: 0,
 };
 
 const str = (v: unknown): string => (typeof v === "string" ? v : "");
@@ -100,6 +101,7 @@ export function deriveTown(state: Pick<StoreState, "events">): TownModel {
   let goalStatus: TownModel["goalStatus"] = "none";
   let circuitOpen = false;
   const dead = new Set<string>();
+  let retries = 0;
 
   const setWorker = (id: string, jobId: string | null) => {
     if (!id) return;
@@ -210,6 +212,7 @@ export function deriveTown(state: Pick<StoreState, "events">): TownModel {
       case "job.retry_scheduled": {
         const t = taskOfJob(str(p.job_id));
         setWorker(str(p.worker), null);
+        if (t) retries++;
         if (t && t.status !== "succeeded") {
           t.status = "retrying";
           t.worker = null;
@@ -263,7 +266,7 @@ export function deriveTown(state: Pick<StoreState, "events">): TownModel {
 
   return {
     goalId, goalStatus, startedMs: started, finishedMs: finished, tasks: list, zones,
-    workers: [...workers.values()], circuitOpen, deadJobs: dead.size,
+    workers: [...workers.values()], circuitOpen, deadJobs: dead.size, retries,
   };
 }
 

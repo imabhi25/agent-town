@@ -81,6 +81,21 @@ describe("deriveTown", () => {
     expect(again).toMatchObject({ status: "running", worker: "w2", retryAtMs: null });
   });
 
+  it("counts retries of this goal's tasks and the goal's elapsed time", () => {
+    const e = [
+      ev("goal.started", G, "2026-01-01T00:00:00Z"),
+      ...DIAMOND,
+      ev("task.queued", { ...G, task_id: "id-t1", job_id: "j1" }),
+      ev("job.retry_scheduled", { job_id: "j1", worker: "w1", attempt: 1, delay: 1 }, "2026-01-01T00:00:01Z"),
+      ev("job.retry_scheduled", { job_id: "j1", worker: "w1", attempt: 2, delay: 1 }, "2026-01-01T00:00:03Z"),
+      ev("job.retry_scheduled", { job_id: "other", worker: "w1", attempt: 1, delay: 1 }, "2026-01-01T00:00:04Z"),
+      ev("goal.succeeded", G, "2026-01-01T00:00:09Z"),
+    ];
+    const m = deriveTown(store(e));
+    expect(m.retries).toBe(2);
+    expect(m.finishedMs! - m.startedMs!).toBe(9000);
+  });
+
   it("dead job leaves rubble and replay rebuilds it", () => {
     const e = [
       ...DIAMOND,
