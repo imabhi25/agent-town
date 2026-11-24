@@ -3,12 +3,14 @@
 // (see CityMap) so three.js is not part of the first paint. Phase A: the static town.
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { cameraPosition, FOV, fitDistance, zoomRange } from "./camera";
 import { C } from "./palette3d";
 import { LAYOUT } from "./town";
-import { TownStatic, type Quality } from "./TownStatic";
+import { TownStatic, type Plan, type Quality } from "./TownStatic";
+import { TownLive } from "./TownLive";
+import type { TownModel } from "./townModel";
 
 declare global {
   interface Window {
@@ -67,7 +69,9 @@ function Rig() {
 
 const PAN = { x: 8, z: 6 };
 
-export default function Scene3D({ quality = "high" }: { quality?: Quality }) {
+export default function Scene3D({ quality = "high", model }: { quality?: Quality; model?: TownModel }) {
+  // No model = the Phase A static preview; with one, the town is built from events.
+  const plan = useMemo<Plan | undefined>(() => (model ? model.zones.map((z) => ({ stage: z.zone, tasks: z.tasks })) : undefined), [model?.zones]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <Canvas
       shadows="soft"
@@ -94,7 +98,8 @@ export default function Scene3D({ quality = "high" }: { quality?: Quality }) {
         shadow-camera-near={1}
         shadow-camera-far={80}
       />
-      <TownStatic quality={quality} />
+      <TownStatic quality={quality} plan={plan} circuitOpen={model?.circuitOpen} />
+      {model && <TownLive model={model} />}
       <OrbitControls
         makeDefault
         enableDamping

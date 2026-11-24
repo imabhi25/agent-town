@@ -1,10 +1,11 @@
-import { Component, lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "react";
+import { Component, lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Api, ApiResult } from "./api";
 import { ApprovalCards, ChaosPanel, DeadLetters, Legend } from "./components";
 import type { ViewMode } from "./city3d/webgl";
 import { CityRenderer } from "./renderer";
 import type { DeadJob, PendingApproval, Scene, SceneSummary } from "./scene";
 import type { StoreState } from "./store";
+import { deriveTown } from "./city3d/townModel";
 
 // three.js is a separate chunk: it is downloaded only when the 3D view is first shown.
 const Scene3D = lazy(() => import("./city3d/Scene3D"));
@@ -63,6 +64,7 @@ export function CityMap({ state, api, view = "2d", onViewFail, floodMax = 100, o
   apiRef.current = api;
   const offRef = useRef(off);
   offRef.current = off;
+  const model = useMemo(() => deriveTown(state), [state.events]); // eslint-disable-line react-hooks/exhaustive-deps
   const [overlay, setOverlay] = useState<Overlay>(EMPTY);
   const [notice, setNotice] = useState("");
 
@@ -108,7 +110,7 @@ export function CityMap({ state, api, view = "2d", onViewFail, floodMax = 100, o
           <div className="map map3d" data-testid="map3d">
             <Boundary3D onFail={(why) => onViewFail?.(why)}>
               <Suspense fallback={<p className="muted loading3d">Loading the 3D city…</p>}>
-                <Scene3D />
+                <Scene3D model={model} />
               </Suspense>
             </Boundary3D>
           </div>

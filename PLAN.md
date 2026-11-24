@@ -36,9 +36,8 @@
 Live URL; a prompt produces a plan and agents visibly work; kill-worker test passes in CI; benchmark numbers in README; demo works without Gemini quota (mock fallback).
 
 ## Step 11: "build the town" 3D view (three.js)
-Status: Phase A (layout + static scene) built, waiting for review. Phase B (building states, agent
-markers, barriers, completion, pipeline panel) and Phase C (performance, fallbacks, tests, docs)
-start only after approval. The design brief file (`docs/reference/design-brief.md`) never arrived, so
+Status: Phase A (layout + static scene) built. Phase B slice 1 built (see "Phase B progress"); the rest of
+Phase B and Phase C (performance, fallbacks, tests, docs) follow. The design brief file (`docs/reference/design-brief.md`) never arrived, so
 this follows the written change request and the concept images; where a value was not given (walking
 speed and so on) the plan says so and it is easy to change.
 
@@ -137,3 +136,16 @@ worker markers along the path graph with snap-when-behind, barriers, the Foreman
 latest event, the completion sequence, the pipeline panel and legend, event-store tests (duplicates
 and out-of-order events).
 
+
+
+### Phase B progress
+Slice 1 (done): `city3d/townModel.ts` folds the store's events into a `TownModel` (tasks with zone, slot,
+status; workers; llm circuit; goal timing), `walker.ts` walks workers along the road graph,
+`TownLive.tsx` draws buildings per status (ghost, scaffold, orange retry with countdown, raised, DLQ
+rubble with a red beacon, approval label), robots and zone counters, and the barriers swing with the
+circuit. `Scene3D` takes the model; with no model it still shows the Phase A preview.
+Correction to the notes above: `task.created.depends_on` holds task **ids**, not keys (checked against
+the recorded traces), so stages are computed over ids.
+Not done yet: Foreman turning toward the latest event, completion banner and sequence, pipeline panel
+and legend, click-to-kill and approval cards in 3D (the DOM overlay is still fed only by the 2D scene),
+snap-when-behind for replay at 4x (walkers only hurry), Playwright e2e.

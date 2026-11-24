@@ -2,6 +2,7 @@
 // the Foreman and idle workers, barriers, labels and decoration. All of it is drawn from
 // town-layout.json; nothing here is positioned by hand. Phase B drives the same objects from events.
 import { Html } from "@react-three/drei";
+import { useFrame } from "@react-three/fiber";
 import { useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { Batch, along, ribbon, slab } from "./kit";
@@ -36,11 +37,14 @@ function robot(b: Batch, x: number, z: number, rotY: number, s: number, accent: 
   }
 }
 
-function useStaticGeometry(): { geo: THREE.BufferGeometry; triangles: number } {
+/** Which zones are in use and how many tasks each holds: drives the tint and the footpaths to slots. */
+export type Plan = { stage: number; tasks: number }[];
+
+function useStaticGeometry(plan: Plan, preview: boolean): { geo: THREE.BufferGeometry; triangles: number } {
   return useMemo(() => {
     const b = new Batch();
     const { zones, plaza } = LAYOUT;
-    const active = new Set(LAYOUT.preview.zones.map((p) => p.stage));
+    const active = new Set(plan.map((p) => p.stage));
 
     // zone discs: a cream footpath rim, then grass tinted with the zone colour (pale when unused)
     zones.forEach((z, i) => {
@@ -53,8 +57,8 @@ function useStaticGeometry(): { geo: THREE.BufferGeometry; triangles: number } {
     // (footpaths inside a zone are drawn only to slots that have a planned task)
     const shown = new Set<string>(["in1", "in2", "in3", "in4", "in5", "in6", "foot_foreman"].filter((id) => !id.startsWith("in") || active.has(Number(id.slice(2)))));
     for (const z of zones) {
-      const plan = LAYOUT.preview.zones.find((p) => p.stage === z.stage);
-      z.slots.slice(0, plan?.tasks ?? 0).forEach((_, k) => shown.add(`${z.id}_p${k + 1}`));
+      const used = plan.find((p) => p.stage === z.stage);
+      z.slots.slice(0, used?.tasks ?? 0).forEach((_, k) => shown.add(`${z.id}_p${k + 1}`));
     }
     for (const { road, pts } of ROADS_SAMPLED) {
       if (road.type === "foot") {
@@ -73,18 +77,21 @@ function useStaticGeometry(): { geo: THREE.BufferGeometry; triangles: number } {
     robot(b, plaza.foreman[0], plaza.foreman[1], 0.3, 1.7, "#7fb5ef", true);
     b.box([0.07, 3.1, 0.07], "#b8b1c2", [plaza.foreman[0] + 1.3, 1.55, plaza.foreman[1] - 0.6]);
     b.box([0.9, 0.5, 0.04], "#f2c14e", [plaza.foreman[0] + 1.75, 2.8, plaza.foreman[1] - 0.6]);
-    // idle workers waiting on the pads (the recorded presets start with three)
-    [0, 2, 4].forEach((k) => {
-      const [px, pz] = plaza.pads[k];
-      robot(b, px, pz, Math.atan2(-px, -pz), 1.15, "#b7b0c4");
-    });
+    // Phase A preview only: idle workers on the pads. Live, TownLive draws every worker (it moves them).
+    if (preview) {
+      [0, 2, 4].forEach((k) => {
+        const [px, pz] = plaza.pads[k];
+        robot(b, px, pz, Math.atan2(-px, -pz), 1.15, "#b7b0c4");
+      });
+    }
 
     // zones: signpost at the hub, ghost foundations for the planned tasks
     zones.forEach((z, i) => {
       b.box([0.08, 1.5, 0.08], "#b8b1c2", [z.x, 0.75, z.z]);
       b.box([0.7, 0.36, 0.05], ZONE_COLORS[i], [z.x + 0.4, 1.3, z.z]);
-      const plan = LAYOUT.preview.zones.find((p) => p.stage === z.stage);
-      z.slots.slice(0, plan?.tasks ?? 0).forEach((s) => {
+      // Phase A preview only: ghost foundations. Live, each building draws its own (it changes with status).
+      const used = preview ? plan.find((p) => p.stage === z.stage) : undefined;
+      z.slots.slice(0, used?.tasks ?? 0).forEach((s) => {
         const rot = (s.rot * Math.PI) / 180;
         b.box([s.size, 0.07, s.size], C.ghost, [s.x, 0.1, s.z], rot);
         const e = s.size / 2 - 0.06;
@@ -102,7 +109,7 @@ function useStaticGeometry(): { geo: THREE.BufferGeometry; triangles: number } {
       b.sphere(0.16, "#ffe8a8", [p.x, 1.5, p.z]);
     }
     return { geo: b.build(), triangles: b.triangles };
-  }, []);
+  }, [plan, preview]);
 }
 
 /** Instanced props of one kind: one draw call for all trees' crowns, one for trunks, and so on. */
@@ -190,8 +197,23 @@ function Arrows() {
 }
 
 /** A boom barrier across a spoke, 1.5x the usual size. `closed` 0 = raised (open), 1 = lowered. */
-function Barrier({ x, z, rot, closed = 0 }: { x: number; z: number; rot: number; closed?: number }) {
+export function Barrier({ x, z, rot, closed = 0 }: { x: number; z: number; rot: number; closed?: number }) {
   const ang = -(rot * Math.PI) / 180;
+  const arm = useRef<THREE.Group>(null);
+  const lamp = useRef<THREE.MeshStandardMaterial>(null);
+  const eased = useRef(closed);
+  // Ease toward the target so the arm swings instead of jumping; nothing moves unless `closed` changes.
+  useFrame((_, dt) => {
+    const d = closed - eased.current;
+    if (Math.abs(d) < 1e-3 && eased.current === closed) return;
+    eased.current = Math.abs(d) < 1e-3 ? closed : eased.current + d * Math.min(1, dt * 5);
+    if (arm.current) arm.current.rotation.x = -(Math.PI * 0.42) * (1 - eased.current);
+    if (lamp.current) {
+      const c = eased.current > 0.5 ? "#e8707a" : "#6cc788";
+      lamp.current.color.set(c);
+      lamp.current.emissive.set(c);
+    }
+  });
   return (
     <group position={[x, 0.06, z]} rotation={[0, ang, 0]}>
       <mesh position={[0, 0.6, -1.5]} castShadow>
@@ -200,9 +222,9 @@ function Barrier({ x, z, rot, closed = 0 }: { x: number; z: number; rot: number;
       </mesh>
       <mesh position={[0, 1.3, -1.5]}>
         <sphereGeometry args={[0.2, 8, 6]} />
-        <meshStandardMaterial color="#6cc788" emissive="#6cc788" emissiveIntensity={0.35} />
+        <meshStandardMaterial ref={lamp} color="#6cc788" emissive="#6cc788" emissiveIntensity={0.35} />
       </mesh>
-      <group position={[0, 1.05, -1.5]} rotation={[-(Math.PI * 0.42) * (1 - closed), 0, 0]}>
+      <group ref={arm} position={[0, 1.05, -1.5]} rotation={[-(Math.PI * 0.42) * (1 - closed), 0, 0]}>
         {[0, 1, 2].map((i) => (
           <mesh key={i} position={[0, 0, 0.35 + i * 0.7]} castShadow>
             <boxGeometry args={[0.2, 0.2, 0.7]} />
@@ -214,12 +236,14 @@ function Barrier({ x, z, rot, closed = 0 }: { x: number; z: number; rot: number;
   );
 }
 
-export function TownStatic({ quality = "high" }: { quality?: Quality }) {
-  const { geo } = useStaticGeometry();
+export function TownStatic({ quality = "high", plan, circuitOpen = false }: { quality?: Quality; plan?: Plan; circuitOpen?: boolean }) {
+  // No plan given = the Phase A preview (happy-path layout with ghosts, labels and three idle workers).
+  const preview = plan === undefined;
+  const used = plan ?? LAYOUT.preview.zones;
+  const { geo } = useStaticGeometry(used, preview);
   const { board, zones, plaza } = LAYOUT;
   const rim = useMemo(() => slab(board.w + 1.4, board.d + 1.4, board.corner + 0.5, 0.9), [board]);
   const top = useMemo(() => slab(board.w, board.d, board.corner, 0.5), [board]);
-  const preview = LAYOUT.preview.zones;
   return (
     <>
       <mesh geometry={rim} position={[0, -0.04, 0]} receiveShadow castShadow>
@@ -234,10 +258,10 @@ export function TownStatic({ quality = "high" }: { quality?: Quality }) {
       <Arrows />
       <Decoration quality={quality} />
       {LAYOUT.gates.map((g) => (
-        <Barrier key={g.id} x={g.x} z={g.z} rot={g.rot} />
+        <Barrier key={g.id} x={g.x} z={g.z} rot={g.rot} closed={circuitOpen ? 1 : 0} />
       ))}
       {/* labels: zone name with a step badge and a built counter; the Foreman */}
-      {preview.map((p) => {
+      {preview && LAYOUT.preview.zones.map((p) => {
         const z = zones[p.stage - 1];
         return (
           <Html key={z.id} position={[z.x, 3.0, z.z]} center zIndexRange={[10, 0]} className="label3d zone">
