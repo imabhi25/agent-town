@@ -118,7 +118,7 @@ function Building({ task, slot, color }: { task: TaskView; slot: SlotSpec; color
 }
 
 /** A worker robot that walks its road route to wherever the model says it should be. */
-function Worker({ view, model, order }: { view: WorkerView; model: TownModel; order: number }) {
+function Worker({ view, model, order, onTap }: { view: WorkerView; model: TownModel; order: number; onTap?: (id: string) => void }) {
   const group = useRef<THREE.Group>(null);
   const walker = useRef<Walker | null>(null);
   walker.current ??= new Walker(`pad${(order % LAYOUT.plaza.pads.length) + 1}`);
@@ -135,7 +135,15 @@ function Worker({ view, model, order }: { view: WorkerView; model: TownModel; or
     if (w.moving) g.rotation.y = w.heading; // standing still keeps the last heading
   });
   return (
-    <group ref={group}>
+    <group
+      ref={group}
+      onClick={(e) => {
+        e.stopPropagation();
+        onTap?.(view.id); // click a robot to kill that worker (the controller refuses it on a recording)
+      }}
+      onPointerOver={() => onTap && (document.body.style.cursor = "pointer")}
+      onPointerOut={() => (document.body.style.cursor = "")}
+    >
       <mesh position={[0, 0.5, 0]} castShadow>
         <boxGeometry args={[0.55, 0.5, 0.4]} />
         <meshStandardMaterial color="#f4f1f8" roughness={0.8} flatShading />
@@ -156,7 +164,7 @@ function Worker({ view, model, order }: { view: WorkerView; model: TownModel; or
   );
 }
 
-export function TownLive({ model }: { model: TownModel }) {
+export function TownLive({ model, onWorkerTap }: { model: TownModel; onWorkerTap?: (id: string) => void }) {
   const workers = useMemo(() => model.workers.filter((w) => !w.gone).sort((a, b) => a.id.localeCompare(b.id)), [model.workers]);
   return (
     <>
@@ -165,7 +173,7 @@ export function TownLive({ model }: { model: TownModel }) {
         return slot ? <Building key={t.id} task={t} slot={slot} color={ZONE_COLORS[t.zone - 1]} /> : null;
       })}
       {workers.map((w, i) => (
-        <Worker key={w.id} view={w} model={model} order={i} />
+        <Worker key={w.id} view={w} model={model} order={i} onTap={onWorkerTap} />
       ))}
       {model.zones.map((z) => {
         const spec = LAYOUT.zones[z.zone - 1];

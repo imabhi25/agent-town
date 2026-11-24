@@ -3,7 +3,7 @@ import type { Api, ApiResult } from "./api";
 import { ApprovalCards, ChaosPanel, DeadLetters, Legend } from "./components";
 import type { ViewMode } from "./city3d/webgl";
 import { CityRenderer } from "./renderer";
-import type { DeadJob, PendingApproval, Scene, SceneSummary } from "./scene";
+import { Scene, type DeadJob, type PendingApproval, type SceneSummary } from "./scene";
 import type { StoreState } from "./store";
 import { deriveTown } from "./city3d/townModel";
 
@@ -79,14 +79,37 @@ export function CityMap({ state, api, view = "2d", onViewFail, floodMax = 100, o
       workerIds: sc.pool.filter((w) => w.active && w.dying === 0).map((w) => w.id).sort(),
       failureRate: sc.failureRate,
     });
+  const onWorkerTap = (id: string) => {
+    if (!offRef.current) void apiRef.current.killWorker(id).then(notify); // not on a recording
+  };
+  // 3D has no PixiJS renderer, so a headless Scene (the same event rules as 2D) feeds the DOM panels:
+  // approval cards, dead letters, the worker list, the legend. It polls the store a few times a second.
+  useEffect(() => {
+    if (view !== "3d") return;
+    const scene = new Scene();
+    let last = -1;
+    const tick = () => {
+      scene.sync(stateRef.current.snapshot, stateRef.current.events, stateRef.current.epoch);
+      scene.step(1); // let killed workers leave the pool
+      if (scene.version !== last) {
+        last = scene.version;
+        showOverlay(scene);
+      }
+    };
+    tick();
+    const id = setInterval(tick, 150);
+    window.__town = { fps: 0, summary: () => scene.summary() };
+    return () => {
+      clearInterval(id);
+      delete window.__town;
+    };
+  }, [view]);
   useEffect(() => {
     if (view !== "2d" || !host.current) return;
     const renderer = new CityRenderer(host.current, {
       getState: () => stateRef.current,
       onChange: () => showOverlay(renderer.scene),
-      onWorkerTap: (id) => {
-        if (!offRef.current) void apiRef.current.killWorker(id).then(notify); // not on a recording
-      },
+      onWorkerTap,
     });
     window.__town = {
       get fps() {
@@ -110,14 +133,14 @@ export function CityMap({ state, api, view = "2d", onViewFail, floodMax = 100, o
           <div className="map map3d" data-testid="map3d">
             <Boundary3D onFail={(why) => onViewFail?.(why)}>
               <Suspense fallback={<p className="muted loading3d">Loading the 3D city…</p>}>
-                <Scene3D model={model} />
+                <Scene3D model={model} onWorkerTap={onWorkerTap} />
               </Suspense>
             </Boundary3D>
           </div>
         )}
         <ApprovalCards approvals={overlay.approvals} api={api} notify={notify} off={off} />
       </div>
-      {view === "2d" && <Legend summary={overlay.summary} />}
+      <Legend summary={overlay.summary} />
       {notice && (
         <p className="notice" role="alert">
           {notice}

@@ -69,7 +69,7 @@ function Rig() {
 
 const PAN = { x: 8, z: 6 };
 
-export default function Scene3D({ quality = "high", model }: { quality?: Quality; model?: TownModel }) {
+export default function Scene3D({ quality = "high", model, onWorkerTap }: { quality?: Quality; model?: TownModel; onWorkerTap?: (id: string) => void }) {
   // No model = the Phase A static preview; with one, the town is built from events.
   const plan = useMemo<Plan | undefined>(() => (model ? model.zones.map((z) => ({ stage: z.zone, tasks: z.tasks })) : undefined), [model?.zones]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
@@ -99,7 +99,7 @@ export default function Scene3D({ quality = "high", model }: { quality?: Quality
         shadow-camera-far={80}
       />
       <TownStatic quality={quality} plan={plan} circuitOpen={model?.circuitOpen} />
-      {model && <TownLive model={model} />}
+      {model && <TownLive model={model} onWorkerTap={onWorkerTap} />}
       <OrbitControls
         makeDefault
         enableDamping
