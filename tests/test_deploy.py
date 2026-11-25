@@ -11,7 +11,7 @@ from starlette.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
 from app.config import Settings, production_problems, settings
-from app.db import is_pooled, pool_kwargs
+from app.db import clean_url, is_pooled, pool_kwargs
 from app.migrate import MIGRATIONS, UnmanagedDatabase, migrate
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -247,3 +247,11 @@ def test_the_browser_bundle_source_never_reads_an_api_key():
         if path.suffix in {".ts", ".tsx"}:
             assert "API_KEY" not in path.read_text().upper(), path
     assert (ROOT / "web" / ".env.example").read_text().count("=") == 1
+
+
+def test_clean_url_drops_neon_channel_binding():
+    # Neon's connection string ends with channel_binding=require, which asyncpg would send to the
+    # server as a setting and fail on. sslmode must survive.
+    url = "postgresql://USER:PASSWORD@ep-x.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+    assert clean_url(url) == "postgresql://USER:PASSWORD@ep-x.us-east-2.aws.neon.tech/neondb?sslmode=require"
+    assert clean_url("postgresql://USER:PASSWORD@h/db") == "postgresql://USER:PASSWORD@h/db"

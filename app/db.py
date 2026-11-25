@@ -8,9 +8,12 @@ Two things a free hosted Postgres needs that a local one does not:
     ("prepared statement does not exist"). `statement_cache_size=0` turns the cache off. The
     simplest fix is to use Neon's DIRECT (non-pooled) host, which needs no workaround: we keep
     only a handful of connections ourselves, so we do not need a pooler.
+  - Neon's copy button adds `channel_binding=require`. libpq knows it, asyncpg does not: asyncpg
+    sends unknown URL parameters to the server as settings, and Postgres refuses the connection
+    ("unrecognized configuration parameter"). `clean_url` drops it; TLS still comes from sslmode.
 """
 
-from urllib.parse import urlparse
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 import asyncpg
 
@@ -20,6 +23,16 @@ from app.config import settings
 def is_pooled(url: str, forced: bool = False) -> bool:
     host = urlparse(url).hostname or ""
     return forced or "-pooler" in host
+
+
+# libpq-only URL parameters that asyncpg would wrongly pass to the server as settings.
+_LIBPQ_ONLY_PARAMS = {"channel_binding"}
+
+
+def clean_url(url: str) -> str:
+    parts = urlparse(url)
+    query = [(k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True) if k not in _LIBPQ_ONLY_PARAMS]
+    return urlunparse(parts._replace(query=urlencode(query)))
 
 
 def pool_kwargs(url: str, forced_pooler: bool = False) -> dict:
@@ -37,7 +50,7 @@ def pool_kwargs(url: str, forced_pooler: bool = False) -> dict:
 async def create_pool(
     min_size: int = 1, max_size: int = 10, url: str | None = None
 ) -> asyncpg.Pool:
-    url = url or settings.database_url
+    url = clean_url(url or settings.database_url)
     return await asyncpg.create_pool(
         url, min_size=min_size, max_size=max_size, **pool_kwargs(url, settings.db_pooler)
     )
