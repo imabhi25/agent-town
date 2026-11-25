@@ -13,7 +13,7 @@
 - [x] Gemini planner (JSON via response_schema, Pydantic validation, retry once, fallback plan)
 - [x] Task dependencies: enqueue only when dependencies finish
 - [x] Events stream + WebSocket gateway (batched ~15 updates/sec)
-- [ ] Integration tests with testcontainers: kill-worker, crash between commit and XACK, duplicate submit, DLQ, retry
+- [x] Integration tests against real Postgres + Redis: kill-worker, crash between commit and XACK, duplicate submit, DLQ, retry (`tests/test_recovery.py`, `test_worker.py`, `test_retries.py`, `test_jobs_api.py`, `test_dlq_api.py`)
 - [x] Synthetic load generator
 
 ## Week 3: visual and controls
@@ -31,13 +31,14 @@
 - [ ] Link Google AI Pro Cloud credits; budget alert
 - [x] k6 benchmark, architecture diagram, design notes, resume bullets (step 10); demo GIF is a placeholder (needs a recording of the deployed site)
 - [x] Stretch: Redis Lua token-bucket rate limiter, circuit breaker
+- [x] `PLANNER=fixed|gemini` setting: presets only by default, no LLM or key needed (#17)
 
 ## MVP done when
 Live URL; a prompt produces a plan and agents visibly work; kill-worker test passes in CI; benchmark numbers in README; demo works without Gemini quota (mock fallback).
 
 ## Step 11: "build the town" 3D view (three.js)
-Status: Phase A (layout + static scene) built. Phase B slice 1 built (see "Phase B progress"); the rest of
-Phase B and Phase C (performance, fallbacks, tests, docs) follow. The design brief file (`docs/reference/design-brief.md`) never arrived, so
+Status: Phase A and Phase B slices 1 to 3 are merged (#18). Still open: the Foreman turning toward the
+latest event, snap-when-behind for 4x replay, Playwright e2e, and Phase C (performance, fallbacks, docs). The design brief file (`docs/reference/design-brief.md`) never arrived, so
 this follows the written change request and the concept images; where a value was not given (walking
 speed and so on) the plan says so and it is easy to change.
 
