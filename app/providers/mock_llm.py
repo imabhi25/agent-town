@@ -9,6 +9,7 @@ job payload's `mock_mode`), then the random `failure_rate`, then success.
 
 import asyncio
 import random
+from collections.abc import Awaitable, Callable
 from enum import StrEnum
 
 from app.config import settings
@@ -21,6 +22,11 @@ class FailureMode(StrEnum):
     BAD_REQUEST = "400"  # not retryable: goes straight to the DLQ
     TIMEOUT = "timeout"
     HANG = "hang"  # never answers: only a caller-side timeout can end the call
+
+
+PROGRESS_STEPS = 4  # a call that reports progress reports 25, 50 and 75 (100 is job.succeeded)
+
+ProgressFn = Callable[[int], Awaitable[None]]
 
 
 class ProviderError(Exception):
@@ -48,14 +54,28 @@ class MockLLM:
         *,
         mode: FailureMode | str | None = None,
         latency: float | None = None,
+        on_progress: ProgressFn | None = None,
     ) -> dict:
         """Return a deterministic JSON-serialisable result, or raise like a real provider would.
 
         `latency` (seconds) overrides the configured random latency for this one call.
+        `on_progress` (a goal's task job): the call takes `settings.task_build_seconds` unless
+        `latency` says otherwise, split into PROGRESS_STEPS sleeps, and reports the percentage
+        done after each sleep but the last. A call that then fails has still reported progress,
+        the same as a real call that dies late.
         """
         if latency is None:
-            latency = self.rng.uniform(self.min_latency, self.max_latency)
-        await asyncio.sleep(latency)
+            if on_progress is not None:
+                latency = settings.task_build_seconds
+            else:
+                latency = self.rng.uniform(self.min_latency, self.max_latency)
+        if on_progress is None:
+            await asyncio.sleep(latency)
+        else:
+            for step in range(1, PROGRESS_STEPS + 1):
+                await asyncio.sleep(latency / PROGRESS_STEPS)
+                if step < PROGRESS_STEPS:
+                    await on_progress(100 * step // PROGRESS_STEPS)
 
         if mode is None and self.rng.random() < self.failure_rate:
             mode = self.rng.choice([FailureMode.RATE_LIMIT, FailureMode.SERVER_ERROR])
