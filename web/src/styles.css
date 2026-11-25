@@ -84,9 +84,9 @@ button.primary:enabled:hover { background: #cfbfff; border-color: #eee5ff; }
 
 .town { display: grid; grid-template-columns: minmax(0, 1fr) minmax(310px, 27.5%); align-items: start; gap: 22px; margin-top: 22px; }
 .stage, .side { min-width: 0; }
-.side { display: grid; gap: 15px; }
+.side { display: grid; gap: 14px; }
 .panel, .map-card { background: var(--surface); border: 1px solid var(--line); border-radius: 13px; box-shadow: 0 4px 18px #0002; }
-.panel { padding: 16px; }
+.panel { padding: 14px 16px; }
 .map-card { overflow: hidden; position: relative; }
 .map-header {
   display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
@@ -211,8 +211,11 @@ button.danger:enabled:hover { background: #432934; border-color: #774959; }
 .pipeline .task.dead em { color: #e3a8b6; }
 .pipeline .task.succeeded em { color: #9dd2b6; }
 
-@media (min-width: 561px) {
+@media (min-width: 700px) {
   .tagline { white-space: nowrap; }
+}
+@media (min-width: 1200px) {
+  .stat:is(.workers, .busy, .queued, .done, .failed) { min-width: 94px; }
 }
 @media (max-width: 1100px) {
   main { padding-inline: 26px; }
