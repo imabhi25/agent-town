@@ -52,23 +52,23 @@ const summary = (page: Page) => page.getByTestId("summary");
 test("draws the map and the first snapshot", async ({ page }) => {
   await openTown(page);
   await expect(page.locator("canvas")).toBeVisible();
-  await expect(summary(page)).toContainText("3 workers (0 busy)");
+  await expect(summary(page)).toContainText("3 workers · 0 busy");
   await expect(summary(page)).toContainText("3 queued");
-  await expect(page.getByTestId("pill")).toHaveText("Live Backend Connected");
+  await expect(page.getByTestId("pill")).toHaveText("Backend connected");
   await page.screenshot({ path: "test-results/map-idle.png" });
 });
 
 test("events drive the workers, counters, DLQ and circuit gate", async ({ page }) => {
   const server = await openTown(page);
   server.send(event("job.started", { worker: "worker-1", job_id: "job-a" }), event("job.started", { worker: "worker-2", job_id: "job-b" }));
-  await expect(summary(page)).toContainText("(2 busy)");
+  await expect(summary(page)).toContainText("2 busy");
   await expect(summary(page)).toContainText("1 queued");
 
   server.send(event("job.succeeded", { worker: "worker-1", job_id: "job-a" }));
   await expect(summary(page)).toContainText("1 done");
 
   server.send(event("job.retry_scheduled", { worker: "worker-2", job_id: "job-b", attempt: 1 }));
-  await expect(summary(page)).toContainText("(0 busy)");
+  await expect(summary(page)).toContainText("0 busy");
 
   server.send(event("circuit.opened", { provider: "gemini" }));
   await expect(summary(page)).toContainText("circuit tripped");
@@ -79,15 +79,15 @@ test("events drive the workers, counters, DLQ and circuit gate", async ({ page }
   await expect(summary(page)).toContainText("circuit ok");
 
   server.send(event("job.dead", { worker: "worker-3", job_id: "dead-job-1234", error: "boom" }));
-  await expect(summary(page)).toContainText("1 dead");
+  await expect(summary(page)).toContainText("1 failed");
   await expect(page.locator("code", { hasText: "dead-job" })).toBeVisible();
   await page.screenshot({ path: "test-results/map-dead.png" });
 
   await page.getByRole("button", { name: "Replay", exact: true }).click();
   await expect.poll(() => server.posts.map((p) => p.url)).toContain("/dlq/dead-job-1234/replay");
   server.send(event("job.replayed", { job_id: "dead-job-1234" }));
-  await expect(summary(page)).toContainText("0 dead");
-  await expect(page.getByText("Nothing dead")).toBeVisible();
+  await expect(summary(page)).toContainText("0 failed");
+  await expect(page.getByText("No failed jobs")).toBeVisible();
 });
 
 test("ignores duplicate events (at-least-once delivery)", async ({ page }) => {
@@ -114,6 +114,7 @@ test("approval card on the map: approve and reject call the API", async ({ page 
 
 test("chaos panel: kill, start, failure rate and flood", async ({ page }) => {
   const server = await openTown(page);
+  await page.getByText("Chaos settings", { exact: true }).click();
   await page.getByRole("combobox", { name: /Worker/ }).selectOption("worker-2");
   await page.getByRole("button", { name: "Kill worker" }).click();
   await page.getByRole("button", { name: "Start worker" }).click();
@@ -129,20 +130,24 @@ test("chaos panel: kill, start, failure rate and flood", async ({ page }) => {
 test("a 429 from the backend is shown, not swallowed", async ({ page }) => {
   await openTown(page);
   await page.route("**/chaos/flood", (r) => r.fulfill({ status: 429, json: { detail: "Too many chaos requests. Try again in 3s." } }));
+  await page.getByText("Chaos settings", { exact: true }).click();
   await page.getByRole("button", { name: /Flood/ }).click();
   await expect(page.getByRole("alert")).toContainText("Too many chaos requests");
 });
 
 test("keyboard: every control is reachable with Tab", async ({ page }) => {
   await openTown(page);
-  // The preset bar comes first in the page; Tab through it until the chaos panel is reached.
-  const worker = page.getByRole("combobox", { name: /Worker/ });
-  for (let i = 0; i < 30 && !(await worker.evaluate((el) => el === document.activeElement)); i++) {
+  const settings = page.getByText("Chaos settings", { exact: true });
+  for (let i = 0; i < 30 && !(await settings.evaluate((el) => el === document.activeElement)); i++) {
     await page.keyboard.press("Tab");
   }
-  await expect(worker).toBeFocused();
-  await page.keyboard.press("Tab");
+  await expect(settings).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
   await expect(page.getByRole("button", { name: "Kill worker" })).toBeFocused();
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("combobox", { name: /Worker/ })).toBeFocused();
 });
 
 test("mobile layout: no horizontal scroll and the panels stack", async ({ page }) => {

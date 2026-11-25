@@ -1,15 +1,15 @@
-// One pastel palette for the whole UI. The CSS custom properties in styles.css mirror these hex
-// values; the Pixi renderer reads the numbers directly.
+// Dusk palette for the accessible 2D fallback. Pixi reads these numbers directly.
 export const PALETTE = {
-  bg: 0xf6f1ea, // warm paper
-  ground: 0xe9e2d6,
-  ink: 0x4a4458,
-  planner: 0xcdb4f6, // lavender
-  queue: 0xf9d9a8, // apricot
-  yard: 0xcfe8d5, // sage
-  downstream: 0xa9d6f5, // sky
-  done: 0xb8e6c1, // mint
-  dlq: 0xf5b5b5, // rose
+  bg: 0x14111c,
+  ground: 0x3f364e,
+  ink: 0x272131,
+  label: 0xeee7f4,
+  planner: 0x58446c, // lavender
+  queue: 0x604d39, // apricot
+  yard: 0x3e534b, // sage
+  downstream: 0x394e63, // sky
+  done: 0x385645, // mint
+  dlq: 0x573e49, // rose
   // worker states
   idle: 0xb7b0c4, // dusty grey-violet
   busy: 0x7fb5ef, // blue

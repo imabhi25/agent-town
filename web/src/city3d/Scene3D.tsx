@@ -51,11 +51,19 @@ function Rig() {
   const last = useRef<number | null>(null);
   useEffect(() => {
     const fit = fitDistance(LAYOUT.board.w, LAYOUT.board.d, size.width / Math.max(1, size.height));
-    const ratio = last.current ? camera.position.length() / last.current : 1;
-    const [x, y, z] = cameraPosition(fit * ratio);
-    camera.position.set(x, y, z);
-    camera.lookAt(0, 0, 0);
     const c = controls as unknown as { minDistance: number; maxDistance: number; target: THREE.Vector3; update: () => void } | null;
+    if (last.current === null) {
+      camera.position.set(...cameraPosition(fit));
+      camera.lookAt(0, 0, 0);
+    } else if (c) {
+      camera.position.sub(c.target).multiplyScalar(fit / last.current).add(c.target);
+    } else {
+      camera.position.multiplyScalar(fit / last.current);
+    }
+    if (camera instanceof THREE.PerspectiveCamera && size.width > 0 && size.height > 0) {
+      // The near edge of the tilted slab projects lower than the far edge projects high.
+      camera.setViewOffset(size.width, size.height, 0, size.height * 0.07, size.width, size.height);
+    }
     if (c) {
       const r = zoomRange(fit);
       c.minDistance = r.min;
@@ -77,16 +85,17 @@ export default function Scene3D({ quality = "high", model, onWorkerTap }: { qual
       shadows="soft"
       dpr={[1, 2]} // never more than 2x pixel density
       camera={{ fov: FOV, near: 0.5, far: 220, position: cameraPosition(48) }}
-      gl={{ antialias: true, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.15 }}
+      gl={{ antialias: true, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.02 }}
       data-testid="canvas3d"
     >
       <color attach="background" args={[C.bg]} />
-      <fog attach="fog" args={[C.bg, 90, 160]} />
-      <hemisphereLight args={["#fff8f0", "#d9d3e8", 1.5]} />
+      <fog attach="fog" args={[C.bg, 64, 116]} />
+      <gridHelper args={[220, 110, "#1b1624", "#1b1624"]} position={[0, -1.02, 0]} />
+      <hemisphereLight args={["#e0d9ff", "#75607c", 1.65]} />
       <directionalLight
-        position={[14, 26, 12]}
-        intensity={2.1}
-        color="#fff3e0"
+        position={[-15, 20, 10]}
+        intensity={2.3}
+        color="#ffd2a1"
         castShadow={quality === "high"}
         shadow-mapSize={[2048, 2048]}
         shadow-bias={-0.0004}
@@ -106,8 +115,8 @@ export default function Scene3D({ quality = "high", model, onWorkerTap }: { qual
         dampingFactor={0.12}
         minPolarAngle={0.45}
         maxPolarAngle={1.1}
-        minAzimuthAngle={-0.5}
-        maxAzimuthAngle={0.5}
+        minAzimuthAngle={-0.3}
+        maxAzimuthAngle={0.9}
         screenSpacePanning={false}
         onChange={(e) => {
           const c = e?.target as { target: THREE.Vector3 } | undefined;

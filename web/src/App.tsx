@@ -4,7 +4,8 @@ import { CityMap } from "./CityMap";
 import { defaultView, parseViewOverride, prefersReducedMotion, supportsWebGL2, type ViewMode } from "./city3d/webgl";
 import { Connection } from "./connection";
 import { Controller } from "./controller";
-import { ModeBar, PresetPicker, PromptBox, StatusPill } from "./controls";
+import { ModeBar, Playback, PresetPicker, PromptBox, StatusPill } from "./controls";
+import { Icon } from "./Icon";
 import { HealthMonitor } from "./health";
 import { Replayer } from "./replay";
 import { TownStore } from "./townStore";
@@ -12,6 +13,14 @@ import type { PresetInfo, Trace } from "./types";
 import "./styles.css";
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? "http://localhost:8000";
+const PIPELINE = [
+  { text: "Prompt", icon: "chat" },
+  { text: "Planner", icon: "sparkle" },
+  { text: "Task graph", icon: "graph" },
+  { text: "Workers", icon: "workers" },
+  { text: "Live map", icon: "map" },
+] as const;
+
 const timers = {
   setTimer: (fn: () => void, ms: number) => setTimeout(fn, ms),
   clearTimer: (t: unknown) => clearTimeout(t as number),
@@ -96,41 +105,25 @@ export function App() {
   return (
     <main>
       <header className="hero">
-        <div>
-          <h1>Agent Town</h1>
-          <p className="tagline">
-            A live map of a real job engine. A goal is planned into a task graph, run by workers on Redis
-            Streams with retries, a dead-letter queue and human approvals, and streamed here as events.
-          </p>
+        <div className="brand">
+          <span className="brand-mark"><Icon name="town" /></span>
+          <div>
+            <h1>Agent Town</h1>
+            <p className="tagline">Give AI agents a goal and watch them build it, one task at a time.</p>
+          </div>
         </div>
         <a className="gh" href="https://github.com/imabhi25/agent-town" target="_blank" rel="noreferrer">
-          View on GitHub
+          <Icon name="github" /> GitHub <Icon name="external" />
         </a>
       </header>
       <ol className="flow" aria-label="How a goal moves through the engine">
-        {["Prompt", "Gemini planner", "Task DAG", "Redis Streams", "Workers", "WebSocket", "This map"].map((s) => (
-          <li key={s}>{s}</li>
+        {PIPELINE.map(({ text, icon }) => (
+          <li key={text}>
+            <span><Icon name={icon} />{text}</span>
+            {icon !== "map" && <Icon name="arrow" />}
+          </li>
         ))}
       </ol>
-      <div className="toolbar">
-        <StatusPill ui={ui} />
-        <ModeBar ui={ui} a={actions} />
-        <div className="modebar" role="group" aria-label="View">
-          <button aria-pressed={view === "3d"} disabled={!webgl2} title={webgl2 ? undefined : "This device has no WebGL2, so only the 2D map is available."} onClick={() => setView("3d")}>
-            3D
-          </button>
-          <button aria-pressed={view === "2d"} onClick={() => setView("2d")}>
-            2D
-          </button>
-        </div>
-        <span className="muted" data-testid="mode">
-          {ui.mode === "live"
-            ? store.status === "open"
-              ? "Showing: live"
-              : "Showing: live (connecting…)"
-            : "Showing: recorded trace"}
-        </span>
-      </div>
       {ui.notice && (
         <p className="notice" role="alert" data-testid="notice">
           {ui.notice}
@@ -151,10 +144,39 @@ export function App() {
         api={api}
         off={ui.liveOffReason}
         notify={(r) => ctl.report(r)}
+        mapControls={
+          <>
+            <ModeBar ui={ui} a={actions} />
+            <div className="modebar" role="group" aria-label="View">
+              <button aria-pressed={view === "3d"} disabled={!webgl2} title={webgl2 ? undefined : "This device has no WebGL2, so only the 2D map is available."} onClick={() => setView("3d")}>
+                3D
+              </button>
+              <button aria-pressed={view === "2d"} onClick={() => setView("2d")}>
+                2D
+              </button>
+            </div>
+          </>
+        }
+        mapStatus={
+          <>
+            <StatusPill ui={ui} />
+            <span className="sr-only" data-testid="mode">
+              {ui.mode === "live"
+                ? store.status === "open" ? "Showing: live" : "Showing: live (connecting…)"
+                : "Showing: recorded trace"}
+            </span>
+          </>
+        }
         sidebar={
           <>
-            <PresetPicker ui={ui} a={actions} />
-            {config?.planner === "gemini" && <PromptBox ui={ui} a={actions} />}
+            <section className="panel goal-panel" aria-label="Goal">
+              <h2>Goal</h2>
+              {config?.planner !== "fixed" && (
+                <PromptBox ui={ui} a={actions} unavailable={config === null ? "Checking planner availability…" : ""} />
+              )}
+              <PresetPicker ui={ui} a={actions} />
+            </section>
+            {ui.mode === "recorded" && <Playback ui={ui} a={actions} />}
           </>
         }
       />

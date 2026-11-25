@@ -24,7 +24,7 @@ test.describe("backend unreachable", () => {
 
   test("works with no backend: plays a recorded preset and explains the disabled controls", async ({ page }) => {
     await page.goto("/");
-    await expect(pill(page)).toHaveText("Recorded Trace (Waking Live Backend...)");
+    await expect(pill(page)).toHaveText("Connecting");
     await expect(page.getByTestId("mode")).toHaveText("Showing: recorded trace");
     // the first preset starts by itself: workers show up from the trace snapshot
     await expect(summary(page)).toContainText("3 workers");
@@ -32,16 +32,15 @@ test.describe("backend unreachable", () => {
       await expect(page.getByRole("button", { name })).toBeVisible();
     }
     // speed up and wait for the end of the trace
-    await page.getByRole("button", { name: "4x" }).click();
+    await page.getByRole("combobox", { name: "Playback speed" }).selectOption("4");
     await expect(summary(page)).toContainText("5 done", { timeout: 15_000 });
     await expect(page.getByRole("group", { name: "Playback" }).getByRole("button", { name: "Replay" })).toBeVisible();
 
-    // the free-text box is hidden until /config reports planner=gemini; live-only controls are
-    // disabled, with the reason
-    await expect(page.getByRole("textbox")).toHaveCount(0);
+    // Live-only inputs and controls stay disabled while the backend is unavailable.
+    await expect(page.getByRole("textbox")).toBeDisabled();
     await expect(page.getByRole("button", { name: "Kill worker" })).toBeDisabled();
     await expect(page.getByRole("button", { name: "Live", exact: true })).toBeDisabled();
-    await expect(page.getByText(/live backend is waking up/).first()).toBeVisible();
+    await expect(page.getByRole("region", { name: "Live controls" }).getByText(/live backend is waking up/)).toBeVisible();
     await page.screenshot({ path: "test-results/recorded-happy-path.png" });
   });
 
@@ -55,13 +54,13 @@ test.describe("backend unreachable", () => {
     await page.getByRole("button", { name: "DLQ, approval and replay" }).click();
     await expect(page.getByText("0/39 events")).toBeVisible(); // loaded, waiting for the clock
     await page.clock.runFor(5500); // the doomed job reaches the DLQ at 4.97s
-    await expect(summary(page)).toContainText("1 dead");
+    await expect(summary(page)).toContainText("1 failed");
     await expect(summary(page)).toContainText("1 awaiting approval");
     // the approval card and the Replay button are there but cannot be clicked on a recording
     await expect(page.getByRole("button", { name: "Approve" })).toBeDisabled();
     await expect(page.getByRole("list").getByRole("button", { name: "Replay" })).toBeDisabled();
     await page.clock.runFor(3600); // approved at 7.5s, replayed at 8.5s, succeeded at 9.0s
-    await expect(summary(page)).toContainText("0 dead");
+    await expect(summary(page)).toContainText("0 failed");
     await expect(summary(page)).not.toContainText("awaiting approval");
     await expect(page.getByRole("group", { name: "Playback" }).getByRole("button", { name: "Replay" })).toBeVisible();
   });
@@ -81,7 +80,7 @@ test.describe("backend unreachable", () => {
   test("goes to 'Live Backend Offline' after 60 seconds without an answer", async ({ page }) => {
     await page.clock.install();
     await page.goto("/");
-    await expect(pill(page)).toHaveText("Recorded Trace (Waking Live Backend...)");
+    await expect(pill(page)).toHaveText("Connecting");
     // Each ping is a real (failed) request, so advance the page clock 5s at a time until the
     // 60s wake window has passed.
     await expect
@@ -92,7 +91,7 @@ test.describe("backend unreachable", () => {
         },
         { intervals: [100], timeout: 20_000 },
       )
-      .toBe("Recorded Trace (Live Backend Offline)");
+      .toBe("Backend offline");
     await expect(summary(page)).toContainText("workers"); // the recording is still there
   });
 
@@ -141,9 +140,9 @@ test.describe("backend wakes up", () => {
   test("flips from a recording to the live backend and clears the recorded events", async ({ page }) => {
     const live = await wake(page);
     await page.goto("/");
-    await expect(pill(page)).toHaveText("Recorded Trace (Waking Live Backend...)");
+    await expect(pill(page)).toHaveText("Connecting");
     await expect(summary(page)).toContainText("3 workers"); // the recording, while waiting
-    await expect(pill(page)).toHaveText("Live Backend Connected");
+    await expect(pill(page)).toHaveText("Backend connected");
     await live.connected;
     await expect(page.getByTestId("mode")).toHaveText("Showing: live");
     // only the live snapshot's two workers: nothing from the recording is left
@@ -154,7 +153,7 @@ test.describe("backend wakes up", () => {
     await expect(page.getByRole("button", { name: "Kill worker" })).toBeEnabled();
 
     live.send({ type: "events", events: [{ id: 9001, stream_id: "9001-0", type: "job.started", payload: { worker: "live-1", job_id: "j" }, ts: new Date().toISOString() }] });
-    await expect(summary(page)).toContainText("(1 busy)");
+    await expect(summary(page)).toContainText("1 busy");
 
     // the visitor goes back to a recording: the live events are gone
     await page.getByRole("button", { name: "Recorded", exact: true }).click();
@@ -168,11 +167,11 @@ test.describe("backend wakes up", () => {
     const live = await wake(page, { planner: "fixed" });
     await page.goto("/");
     await live.connected;
-    await expect(page.getByTestId("pill")).toHaveText("Live Backend Connected");
+    await expect(page.getByTestId("pill")).toHaveText("Backend connected");
     await page.waitForTimeout(500); // /config has been asked by now
     await expect(page.getByRole("button", { name: "Happy path" })).toBeVisible();
     await expect(page.getByLabel("Your own goal")).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Plan it" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Run goal" })).toHaveCount(0);
   });
 
   test("a typed prompt is sent; a 429 shows a friendly message", async ({ page }) => {
@@ -181,7 +180,7 @@ test.describe("backend wakes up", () => {
     await live.connected;
     await expect(page.getByTestId("mode")).toHaveText("Showing: live");
     await page.getByRole("textbox").fill("Plan a weekend in Lisbon");
-    await page.getByRole("button", { name: "Plan it" }).click();
+    await page.getByRole("button", { name: "Run goal" }).click();
     await expect(page.getByTestId("notice")).toContainText("Daily live-goal cap reached.");
     await expect(page.getByTestId("notice")).toContainText("Pick a preset");
     expect(live.posts).toEqual(['{"prompt":"Plan a weekend in Lisbon"}']);
@@ -194,7 +193,7 @@ test.describe("backend wakes up", () => {
     await expect(page.getByTestId("mode")).toHaveText("Showing: live");
     live.close();
     await expect(page.getByTestId("notice")).toContainText("live backend disconnected");
-    await expect(pill(page)).toHaveText("Recorded Trace (Live Backend Offline)");
+    await expect(pill(page)).toHaveText("Backend offline");
     await expect(page.getByTestId("mode")).toHaveText("Showing: recorded trace");
     await expect(summary(page)).toContainText("3 workers");
   });
@@ -203,7 +202,7 @@ test.describe("backend wakes up", () => {
     await wake(page);
     await page.goto("/");
     await page.getByRole("button", { name: "Chaos recovery" }).click();
-    await expect(pill(page)).toHaveText("Live Backend Connected");
+    await expect(pill(page)).toHaveText("Backend connected");
     await expect(page.getByTestId("mode")).toHaveText("Showing: recorded trace");
     await expect(page.getByRole("button", { name: "Live", exact: true })).toBeEnabled();
   });

@@ -60,7 +60,7 @@ function Building({ task, slot, color }: { task: TaskView; slot: SlotSpec; color
     <group position={[slot.x, 0, slot.z]} rotation={[0, rot, 0]}>
       <mesh position={[0, 0.1, 0]} receiveShadow>
         <boxGeometry args={[s, 0.07, s]} />
-        <meshStandardMaterial color={task.status === "dead" ? "#cfc8c8" : C.ghost} roughness={0.9} flatShading />
+        <meshStandardMaterial color={task.status === "dead" ? "#6b505a" : C.ghost} roughness={0.9} flatShading />
       </mesh>
       {[[0, -e, s, 0.1], [0, e, s, 0.1], [-e, 0, 0.1, s], [e, 0, 0.1, s]].map(([x, z, w, d], i) => (
         <mesh key={i} position={[x, 0.13, z]}>
@@ -71,11 +71,29 @@ function Building({ task, slot, color }: { task: TaskView; slot: SlotSpec; color
       <group ref={body} scale={[1, 0.001, 1]} visible={false}>
         <mesh position={[0, h / 2 + 0.1, 0]} castShadow receiveShadow>
           <boxGeometry args={[s * 0.82, h, s * 0.82]} />
-          <meshStandardMaterial color={blend(C.wall, color, 0.35)} roughness={0.85} flatShading />
+          <meshStandardMaterial color={blend(C.wall, color, 0.18)} roughness={0.85} flatShading />
         </mesh>
-        <mesh position={[0, h + 0.1 + s * 0.2, 0]} rotation={[0, Math.PI / 4, 0]} castShadow>
-          <coneGeometry args={[s * 0.68, s * 0.4, 4]} />
-          <meshStandardMaterial color={color} roughness={0.8} flatShading />
+        <mesh position={[0, h + 0.1 + s * 0.26, 0]} rotation={[0, Math.PI / 4, 0]} castShadow>
+          <coneGeometry args={[s * 0.69, s * 0.52, 4]} />
+          <meshStandardMaterial color={C.roofs[task.zone - 1]} roughness={0.8} flatShading />
+        </mesh>
+        <mesh position={[s * 0.21, h + s * 0.32, -s * 0.18]} castShadow>
+          <boxGeometry args={[s * 0.14, s * 0.5, s * 0.14]} />
+          <meshStandardMaterial color={C.trim} roughness={0.9} />
+        </mesh>
+        <mesh position={[0, s * 0.24, s * 0.414]}>
+          <boxGeometry args={[s * 0.18, s * 0.32, s * 0.025]} />
+          <meshStandardMaterial color={C.trim} roughness={0.9} />
+        </mesh>
+        {[-0.24, 0.24].map((x) => (
+          <mesh key={x} position={[s * x, h * 0.66, s * 0.416]}>
+            <boxGeometry args={[s * 0.14, s * 0.16, s * 0.025]} />
+            <meshStandardMaterial color={C.window} emissive={C.window} emissiveIntensity={0.75} />
+          </mesh>
+        ))}
+        <mesh position={[s * 0.416, h * 0.66, 0]}>
+          <boxGeometry args={[s * 0.025, s * 0.17, s * 0.23]} />
+          <meshStandardMaterial color={C.window} emissive={C.window} emissiveIntensity={0.75} />
         </mesh>
       </group>
       <group ref={scaffold} visible={false}>

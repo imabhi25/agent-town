@@ -29,6 +29,17 @@ describe("ChaosPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Kill worker" }));
     await waitFor(() => expect(api.killWorker).toHaveBeenLastCalledWith("worker-2"));
   });
+  it("requires a new selection when the selected worker leaves", () => {
+    const api = fakeApi();
+    const props = { api, floodMax: 100, notify: () => {} };
+    const { rerender } = render(<ChaosPanel {...props} workerIds={["worker-1"]} />);
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "worker-1" } });
+    rerender(<ChaosPanel {...props} workerIds={["worker-2"]} />);
+    const kill = screen.getByRole("button", { name: "Kill worker" }) as HTMLButtonElement;
+    expect(kill.disabled).toBe(true);
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "worker-2" } });
+    expect(kill.disabled).toBe(false);
+  });
   it("starts a worker", async () => {
     const api = fakeApi();
     render(<ChaosPanel api={api} workerIds={[]} floodMax={100} notify={() => {}} />);
@@ -78,7 +89,7 @@ describe("ChaosPanel", () => {
 describe("DeadLetters", () => {
   it("shows an empty state", () => {
     render(<DeadLetters jobs={[]} api={fakeApi()} notify={() => {}} />);
-    expect(screen.getByText(/Nothing dead/)).toBeTruthy();
+    expect(screen.getByText(/No failed jobs/)).toBeTruthy();
     expect(screen.queryByRole("button")).toBeNull();
   });
   it("lists dead jobs, each with its own Replay button", async () => {
@@ -118,6 +129,6 @@ describe("Legend", () => {
     render(<Legend summary={{ workers: 4, busy: 2, queue: 7, done: 9, dead: 1, circuit: "tripped", approvals: 2 }} />);
     const el = screen.getByRole("status");
     expect(el.getAttribute("aria-live")).toBe("polite");
-    expect(el.textContent).toBe("4 workers (2 busy) · 7 queued · 9 done · 1 dead · circuit tripped · 2 awaiting approval");
+    expect(el.textContent).toBe("4 workers · 2 busy · 7 queued · 9 done · 1 failed · circuit tripped · 2 awaiting approval");
   });
 });
