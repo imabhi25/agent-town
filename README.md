@@ -44,6 +44,16 @@ guarded update matches nothing, and nothing is duplicated: at-least-once deliver
 completion in one Postgres transaction gives one stored result per job. Likewise a job and its outbox row, and a state change and its event, are
 written in one transaction, so the database and the queue cannot disagree.
 
+## Configuration
+The backend reads these environment variables (`.env.example` has them all; hosted-demo values are in [docs/DEPLOY.md](docs/DEPLOY.md)).
+
+| Variable | Default | What it does |
+|---|---|---|
+| `PLANNER` | `fixed` | `fixed`: a goal is planned from a preset id into a built-in task graph, with no LLM, no key and no quota; free text gets a 400 and the web app hides the box. `gemini`: the real planner (validated, retried once, fallback plan), mock planner without a key |
+| `DATABASE_URL`, `REDIS_URL` | local compose | Postgres and Redis |
+| `GEMINI_API_KEY`, `GEMINI_DAILY_CAP` | empty, `50` | Only used when `PLANNER=gemini`; server-side only |
+| `LIVE_DEMO`, `CORS_ORIGINS`, `LIVE_GOALS_DAILY_CAP` | off | The public-demo profile and its limits |
+
 ## Run it
 Backend (needs Postgres and Redis; Docker Compose provides both):
 ```bash

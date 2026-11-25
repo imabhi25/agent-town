@@ -49,3 +49,14 @@ export function createApi(baseUrl: string, fetchFn: typeof fetch = fetch): Api {
     reject: (id) => post(`/tasks/${encodeURIComponent(id)}/reject`),
   };
 }
+
+/** What GET /config says. `planner` decides whether free-text goals are offered at all. */
+export interface PublicConfig {
+  planner: "fixed" | "gemini";
+}
+
+/** Asks the backend which planner it runs. Anything unexpected counts as "fixed" (box stays hidden). */
+export function parseConfig(body: unknown): PublicConfig {
+  const planner = (body as { planner?: unknown } | null)?.planner;
+  return { planner: planner === "gemini" ? "gemini" : "fixed" };
+}
