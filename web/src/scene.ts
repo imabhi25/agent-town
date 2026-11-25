@@ -179,6 +179,7 @@ export class Scene {
       case "goal.created":
         this.queueDepth++;
         this.plannerPulse = 1;
+        this.version++;
         break;
       case "goal.planned":
         this.plannerPulse = 1;
@@ -188,10 +189,12 @@ export class Scene {
       case "job.reconciled":
         this.queueDepth++;
         this.queuePulse = 1;
+        this.version++;
         break;
       case "chaos.flood":
         this.queueDepth += Number(p.count) || 0;
         this.queuePulse = 1;
+        this.version++;
         break;
       case "chaos.config": // someone (maybe another browser) changed the mock failure rate
         if (typeof p.failure_rate === "number") {
@@ -209,17 +212,20 @@ export class Scene {
         const w = this.ensureWorker(str(p.worker));
         if (this.queueDepth > 0) this.queueDepth--;
         if (w) this.startJob(w, str(p.job_id));
+        this.version++;
         break;
       }
       case "job.succeeded": {
         this.done++;
         this.errand(str(p.worker), "success", "done");
+        this.version++;
         break;
       }
       case "job.retry_scheduled":
         this.queueDepth++;
         this.queuePulse = 1;
         this.errand(str(p.worker), "retrying", "queue");
+        this.version++;
         break;
       case "job.dead": {
         this.dead++;

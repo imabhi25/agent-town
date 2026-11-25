@@ -34,6 +34,22 @@ describe("only events move the scene", () => {
 });
 
 describe("worker lifecycle", () => {
+  it("invalidates the overlay when known workers change job counters", () => {
+    const s = new Scene();
+    feed(s, ev("worker.started", { worker: "w1" }));
+    const changes = [
+      ev("job.created", { job_id: "j1" }),
+      ev("job.started", { worker: "w1", job_id: "j1" }),
+      ev("job.succeeded", { worker: "w1", job_id: "j1" }),
+    ];
+
+    for (const event of changes) {
+      const version = s.version;
+      feed(s, event);
+      expect(s.version).toBeGreaterThan(version);
+    }
+    expect(s.summary()).toMatchObject({ queue: 0, busy: 0, done: 1 });
+  });
   it("job.started: worker turns busy and walks to Downstream", () => {
     const s = new Scene();
     feed(s, ev("worker.started", { worker: "w1" }), ev("job.started", { worker: "w1", job_id: "j1" }));
