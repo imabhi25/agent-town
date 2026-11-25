@@ -95,8 +95,24 @@ export function App() {
 
   return (
     <main>
-      <header>
-        <h1>Agent Town</h1>
+      <header className="hero">
+        <div>
+          <h1>Agent Town</h1>
+          <p className="tagline">
+            A live map of a real job engine. A goal is planned into a task graph, run by workers on Redis
+            Streams with retries, a dead-letter queue and human approvals, and streamed here as events.
+          </p>
+        </div>
+        <a className="gh" href="https://github.com/imabhi25/agent-town" target="_blank" rel="noreferrer">
+          View on GitHub
+        </a>
+      </header>
+      <ol className="flow" aria-label="How a goal moves through the engine">
+        {["Prompt", "Gemini planner", "Task DAG", "Redis Streams", "Workers", "WebSocket", "This map"].map((s) => (
+          <li key={s}>{s}</li>
+        ))}
+      </ol>
+      <div className="toolbar">
         <StatusPill ui={ui} />
         <ModeBar ui={ui} a={actions} />
         <div className="modebar" role="group" aria-label="View">
@@ -114,16 +130,12 @@ export function App() {
               : "Showing: live (connecting…)"
             : "Showing: recorded trace"}
         </span>
-      </header>
+      </div>
       {ui.notice && (
         <p className="notice" role="alert" data-testid="notice">
           {ui.notice}
         </p>
       )}
-      <div className="panels top">
-        <PresetPicker ui={ui} a={actions} />
-        {config?.planner === "gemini" && <PromptBox ui={ui} a={actions} />}
-      </div>
       {viewNotice && (
         <p className="notice" role="status" data-testid="view-notice">
           {viewNotice}
@@ -136,7 +148,16 @@ export function App() {
           setView("2d");
         }}
         state={store}
-        api={api} off={ui.liveOffReason} notify={(r) => ctl.report(r)} />
+        api={api}
+        off={ui.liveOffReason}
+        notify={(r) => ctl.report(r)}
+        sidebar={
+          <>
+            <PresetPicker ui={ui} a={actions} />
+            {config?.planner === "gemini" && <PromptBox ui={ui} a={actions} />}
+          </>
+        }
+      />
     </main>
   );
 }

@@ -37,6 +37,7 @@ export function PipelinePanel({ model }: { model: TownModel }) {
           <li key={z.zone}>
             <span className="stage-head">
               <b className="badge" style={{ background: ZONE_COLORS[z.zone - 1] }}>{z.zone}</b>
+              <span className="stage-name">Stage {z.zone}</span>
               <span className="count3d">{z.built}/{z.tasks} built</span>
             </span>
             <ul>

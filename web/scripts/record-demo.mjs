@@ -25,7 +25,7 @@ const out = process.argv[2] ?? "demo-recording";
 const state = async () => (await fetch("http://localhost:8000/state")).json();
 (async () => {
   const b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH }); // unset = Playwright's own browser
-  const vp = { width: 1280, height: 1300 };
+  const vp = { width: 1280, height: 1040 };
   const ctx = await b.newContext({ viewport: vp });
   const p = await ctx.newPage();
   // CDP screencast instead of Playwright's recordVideo: its low-bitrate VP8 smears the 3D scene.
@@ -44,8 +44,12 @@ const state = async () => (await fetch("http://localhost:8000/state")).json();
   const cap = (text) => p.evaluate((t) => {
     let el = document.getElementById('demo-cap');
     if (!el) { el = document.createElement('div'); el.id = 'demo-cap';
-      el.style.cssText = 'position:fixed;left:50%;top:268px;transform:translateX(-50%);z-index:9999;background:#2b2440;color:#fff;font:600 22px system-ui,sans-serif;padding:10px 20px;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.25);white-space:nowrap';
+      el.style.cssText = 'position:fixed;transform:translateX(-50%);z-index:9999;background:#2b2440;color:#fff;font:600 20px system-ui,sans-serif;padding:9px 18px;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.25);white-space:nowrap';
       document.body.appendChild(el); }
+    // centre it near the top of the map canvas
+    const map = document.querySelector('canvas')?.getBoundingClientRect();
+    el.style.left = map ? `${map.left + map.width / 2}px` : '50%';
+    el.style.top = map ? `${map.top + 14}px` : '240px';
     el.textContent = t; }, text);
   await p.goto('http://localhost:5173');
   await p.getByRole('button', { name: 'Live', exact: true }).click({ timeout: 15000 });

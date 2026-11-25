@@ -246,6 +246,16 @@ The row lock makes two workers claiming at once take turns, so the second always
 
 **The camera fits the board, not a fixed number.** The default distance is found by projecting the board's corners through the real camera so the widest part takes 85% of the width; it is recomputed on resize and the zoom limits are relative to it.
 
+
+## UI polish: a page that explains itself
+**The first screen says what this is.** A one-line tagline and a strip of the pipeline (prompt, planner, task DAG, Redis Streams, workers, WebSocket, map) sit above the map, so someone who lands on the demo understands it before pressing anything.
+
+**Map first, controls beside it.** On wide screens the map takes the left column and presets, playback and the pipeline sit in a sticky sidebar, so the town is above the fold and the pipeline can be read next to it. Below 1000px the same elements become one column (presets, map, counters, pipeline, live controls) using `display: contents` and `order`, so there is one component tree for both layouts.
+
+**Counters are chips, but still one sentence.** The counters under the map are coloured chips (dead and a tripped circuit in red). Visually hidden " · " separators keep the element's text the same sentence as before, so screen readers and the existing tests read it unchanged.
+
+**Live controls are grouped and labelled.** Chaos and the dead-letter queue sit under one "Live controls" heading that says what they are for, with a tag when they need the live backend, so greyed-out buttons on a recording read as intentional, not broken.
+
 ## Demo GIF
 **Recorded locally, not from the deployed site.** The live demo runs two workers with a 45 s lease
 to save free-tier Redis commands, so a crash and recovery would take most of a minute to show. The
