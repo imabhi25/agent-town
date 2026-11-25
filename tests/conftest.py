@@ -9,6 +9,15 @@ from app.dispatcher import STREAM
 from app.event_publisher import EVENTS_STREAM
 from app.retry import DELAYED_KEY, DLQ_STREAM
 
+
+@pytest.fixture(autouse=True)
+def _free_text_planner(monkeypatch):
+    """The public default is PLANNER=fixed (presets only). Most tests submit free-text goals, so
+    they run with the "gemini" planner (mock planner here: no key). Tests of the fixed planner set
+    settings.planner = "fixed" themselves."""
+    monkeypatch.setattr(settings, "planner", "gemini")
+
+
 TRUNCATE_ALL = "TRUNCATE goals, tasks, jobs, job_outputs, outbox, events CASCADE"
 
 

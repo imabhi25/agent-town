@@ -21,6 +21,7 @@ from app.jobs import MockFieldRejected
 from app.jobs import create_job as insert_job
 from app.loadgen import run_load_generator
 from app.migrate import migrate
+from app.planner import PRESET_IDS, PRESETS, preset_list
 from app.protection import GoalGuard
 from app.reconcile import reconcile
 from app.redis_budget import CommandBudget, CountingRedis
@@ -96,7 +97,8 @@ app.include_router(chaos_router)
 
 
 class GoalIn(BaseModel):
-    prompt: str = Field(min_length=1, max_length=500)
+    prompt: str | None = Field(default=None, min_length=1, max_length=500)
+    preset: str | None = None  # a preset id (see GET /config); required when PLANNER=fixed
 
 
 class JobIn(BaseModel):
@@ -167,12 +169,39 @@ async def ws_endpoint(websocket: WebSocket):
         await state.hub.unregister(client)
 
 
+@app.get("/config")
+async def public_config():
+    """What the page needs to know to decide which controls to show. Nothing secret."""
+    return {"planner": settings.planner, "presets": preset_list()}
+
+
+def _planner_input(body: GoalIn) -> tuple[str, str | None]:
+    """(goal text, preset id) for a request, or a 400 that says what is allowed."""
+    if body.preset is not None and body.preset not in PRESETS:
+        raise HTTPException(status_code=400, detail=_bad_input("Unknown preset."))
+    if body.preset is not None:
+        return PRESETS[body.preset].goal, body.preset
+    if settings.planner == "fixed":
+        raise HTTPException(
+            status_code=400,
+            detail=_bad_input("Free-text goals are switched off in this demo (fixed planner)."),
+        )
+    if body.prompt is None:
+        raise HTTPException(status_code=400, detail=_bad_input("Send a prompt."))
+    return body.prompt, None
+
+
+def _bad_input(message: str) -> str:
+    return f"{message} Pick one of the presets: {', '.join(PRESET_IDS)}."
+
+
 @app.post("/goals", status_code=201)
 async def create_goal(body: GoalIn, request: Request):
     """Create a goal and queue its planner job (type 'planner') in one transaction.
 
     A worker plans it later; the tasks appear with goal.planned / task.created events.
     """
+    text, preset = _planner_input(body)  # a bad request costs no rate-limit token
     guard = getattr(request.app.state, "guard", None)
     if guard is not None:
         denial = await guard.check(request)
@@ -181,7 +210,7 @@ async def create_goal(body: GoalIn, request: Request):
             raise HTTPException(status_code=status, detail=message, headers=headers)
     pool: asyncpg.Pool = request.app.state.pool
     async with pool.acquire() as conn, conn.transaction():
-        goal_id = await goals.create_goal(conn, body.prompt)
+        goal_id = await goals.create_goal(conn, text, preset)
     return {"id": str(goal_id), "status": "planning"}
 
 

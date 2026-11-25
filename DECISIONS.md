@@ -224,11 +224,34 @@ The row lock makes two workers claiming at once take turns, so the second always
 
 **README.** Rewritten around: pitch, live link (placeholder until deploy), Mermaid architecture, delivery guarantee (at-least-once delivery, one stored result per job, not exactly-once), how to run, benchmark table, design decisions, free-tier limits. The demo GIF is a TODO: it needs a screen recording of the deployed site, which cannot be made from here.
 
+## Step 10b: PLANNER setting (fixed by default)
+**Why `fixed` is the public default.** The public demo should need no key, spend no quota, and look the same every visit. With `PLANNER=fixed` a goal is created from a preset id (`POST /goals {"preset": "happy-path"}`, the same four ids as the recorded traces) and the planner job returns a built-in task graph from `app/planner.py`: no Gemini client is even built, `GEMINI_API_KEY` is ignored, and worker steps use the mock provider. A free-text goal is refused with a 400 that lists the presets, before the rate limiter is touched and before any row is written.
+
+**`gemini` stays built and tested.** `PLANNER=gemini` is the earlier behaviour unchanged: Pydantic validation, one retry, then the fallback plan, and the mock planner when there is no key or the daily cap is used up. The test suite runs with `gemini` by default (an autouse fixture in `tests/conftest.py`), because most tests submit free-text goals; the fixed planner has its own tests.
+
+**The page asks, it does not assume.** `GET /config` returns `{planner, presets}` (nothing secret). The free-text box is shown only when it says `gemini`; presets always show. If `/config` cannot be reached the box stays hidden, which is the safe side.
+
+**Plan source.** A preset plan is stored with `plan_source = 'fixed'`. A planner job with no preset (queued before the switch) gets the deterministic mock plan, never an LLM.
+
+## Step 11: the 3D "build the town" view
+**Why three.js, and a real 3D scene.** A perspective camera, lights and shadows give the depth the 2D map cannot; the 2D PixiJS map stays as the fallback (no WebGL2, reduced motion, a failed chunk). three.js is a separate lazily loaded chunk, so first paint does not pay for it.
+
+**Why the scene reads only the event store.** Recorded traces and the live WebSocket already go through one store (deduped by id, ordered), so feeding the 3D view from it means a recording and a live run can never look different, and nothing animates unless an event said so.
+
+**Zones are DAG stages.** Tasks carry no kind or group, and adding one would mean changing the engine and re-recording the traces. A task's stage (1 + the deepest stage among its dependencies) is already in `task.created.depends_on`, works for every recorded trace, and gives the plan a natural left-to-right-around-the-ring reading. More than 6 stages merge into the last zone.
+
+**The layout is data.** `docs/reference/town-layout.json` is written by a seeded script and read by the app and its tests: zones, 8 slots each, roads as spline centrelines, the path graph, barriers and props. Tests check no overlaps, every slot reachable from the plaza, one non-crossing main ring, props off the roads, the decoration triangle budget, and that every preset and recorded trace fits.
+
+**Static geometry is merged, repeated things are instanced.** Roads, plaza, foundations, robots and lamps are one mesh with vertex colours; trees, bushes, rocks, flowers, fences and road arrows are InstancedMeshes. Phase A draws in 40 calls and 14k triangles against budgets of 150 and 56k.
+
+**The camera fits the board, not a fixed number.** The default distance is found by projecting the board's corners through the real camera so the widest part takes 85% of the width; it is recomputed on resize and the zoom limits are relative to it.
+
 ## Demo GIF
 **Recorded locally, not from the deployed site.** The live demo runs two workers with a 45 s lease
 to save free-tier Redis commands, so a crash and recovery would take most of a minute to show. The
 GIF instead runs the same engine locally with the mock planner and mock LLM (no API spend) and
-shorter timings: 2 to 2.5 s per mock call, 1.5 s heartbeat TTL, 2.5 s lease. The code path is the
+shorter timings: 3 to 3.5 s per mock call, 1.5 s heartbeat TTL, 2.5 s lease, and the GIF plays
+at 1.2x. The code path is the
 real one: the killed worker's message stays unacknowledged, `XAUTOCLAIM` hands it to another
 worker, and the database ends with one stored result per job (checked after recording).
 
@@ -236,4 +259,6 @@ worker, and the database ends with one stored result per job (checked after reco
 Playwright: type a goal, wait for a worker that holds a task job (the planner job is instant, so it
 needs the same job on two polls), kill that worker, wait for the job to show up on a different
 worker, start a fresh worker, approve the last task. The numbered captions are an overlay added by
-the script only. When the map changes (for example the 3D town), rerun the script and ffmpeg.
+the script only. Frames come from a CDP screencast (JPEG plus real timestamps) rather than
+Playwright's `recordVideo`, whose low-bitrate VP8 smeared the 3D scene. When the map changes,
+rerun the script and ffmpeg.

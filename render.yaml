@@ -15,6 +15,8 @@ services:
         value: "true"              # Neon starts empty: apply migrations/*.sql at startup
       - key: TRUST_FORWARDED_FOR
         value: "true"              # Render's proxy sets X-Forwarded-For: per-IP limits need it
+      - key: PLANNER
+        value: "fixed"             # presets only: no Gemini, no key, no quota, same demo every time
       - key: DATABASE_URL
         sync: false                # Neon direct connection string, with ?sslmode=require
       - key: REDIS_URL

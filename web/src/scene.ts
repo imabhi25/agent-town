@@ -99,6 +99,7 @@ export class Scene {
   private byId = new Map<string, SceneWorker>();
   private applied = new Set<number>();
   private lastSnapshot: Snapshot | null = null;
+  private epoch = 0;
 
   queueDepth = 0;
   done = 0;
@@ -115,7 +116,13 @@ export class Scene {
   // ---- store -> scene ----------------------------------------------------------------------
 
   /** Bring the scene up to date with the store. Cheap when nothing changed. */
-  sync(snapshot: Snapshot | null, events: TownEvent[]): void {
+  sync(snapshot: Snapshot | null, events: TownEvent[], epoch = 0): void {
+    // The store was reset (source switched, replay restarted): forget everything, or the events of
+    // the same recording would all be skipped as "already applied". `epoch` is the store's reset count.
+    if (epoch !== this.epoch) {
+      this.epoch = epoch;
+      this.clear();
+    }
     if (snapshot !== null && snapshot !== this.lastSnapshot) this.rebase(snapshot);
     for (let i = 0; i < events.length; i++) {
       const e = events[i];
@@ -126,6 +133,23 @@ export class Scene {
     if (this.applied.size > 4 * events.length + 1000) {
       this.applied = new Set(events.map((e) => e.id)); // keep it bounded
     }
+  }
+
+  private clear(): void {
+    this.lastSnapshot = null;
+    this.applied = new Set();
+    for (const w of this.pool) {
+      w.active = false;
+      w.dying = 0;
+    }
+    this.byId.clear();
+    this.queueDepth = 0;
+    this.done = 0;
+    this.dead = 0;
+    this.deadJobs = [];
+    this.approvals = [];
+    this.openCircuits.clear();
+    this.version++;
   }
 
   /** A snapshot is the truth: reset counters and the worker list. Its events are already counted. */

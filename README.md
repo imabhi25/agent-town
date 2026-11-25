@@ -12,8 +12,8 @@ sleeps, and switches to live when the backend wakes.
 ![Demo: a goal runs on the city map, a worker is killed mid-job, another worker reclaims the job, and the goal finishes after approval](docs/demo.gif)
 
 _A goal planned by the mock planner, a worker killed mid-job and its job reclaimed by another worker,
-then a human approval. Recorded locally with shortened leases; re-record with
-[web/scripts/record-demo.mjs](web/scripts/record-demo.mjs)._
+then a human approval, on the 3D town. Recorded locally with shortened leases and played at 1.2x;
+re-record with [web/scripts/record-demo.mjs](web/scripts/record-demo.mjs)._
 
 ## Architecture
 ```mermaid
@@ -46,6 +46,16 @@ row count, commit, and only then `XACK`. A crash between commit and `XACK` cause
 guarded update matches nothing, and nothing is duplicated: at-least-once delivery plus idempotent
 completion in one Postgres transaction gives one stored result per job. Likewise a job and its outbox row, and a state change and its event, are
 written in one transaction, so the database and the queue cannot disagree.
+
+## Configuration
+The backend reads these environment variables (`.env.example` has them all; hosted-demo values are in [docs/DEPLOY.md](docs/DEPLOY.md)).
+
+| Variable | Default | What it does |
+|---|---|---|
+| `PLANNER` | `fixed` | `fixed`: a goal is planned from a preset id into a built-in task graph, with no LLM, no key and no quota; free text gets a 400 and the web app hides the box. `gemini`: the real planner (validated, retried once, fallback plan), mock planner without a key |
+| `DATABASE_URL`, `REDIS_URL` | local compose | Postgres and Redis |
+| `GEMINI_API_KEY`, `GEMINI_DAILY_CAP` | empty, `50` | Only used when `PLANNER=gemini`; server-side only |
+| `LIVE_DEMO`, `CORS_ORIGINS`, `LIVE_GOALS_DAILY_CAP` | off | The public-demo profile and its limits |
 
 ## Run it
 Backend (needs Postgres and Redis; Docker Compose provides both):
@@ -106,3 +116,9 @@ used. Check each provider's current limits. See [docs/DEPLOY.md](docs/DEPLOY.md)
 ## Repository map
 `app/` backend (engine, API, hub, protection) · `migrations/` SQL · `web/` React + PixiJS app and recorded traces in `web/public/traces/` ·
 `tests/` pytest · `scripts/` chaos demo, trace recorder, secret scan · `bench/` k6 benchmark · `docs/` deploy guide, benchmarks, interview notes, progress log · `PLAN.md`, `DECISIONS.md`.
+
+## Credits
+The 3D view (Step 11) is built with [three.js](https://threejs.org) (MIT), react-three-fiber and
+drei (MIT). Every building, tree, road and robot in it is generated from three.js primitives, so
+no third-party 3D model files are shipped yet. If CC0 packs are added later (Kenney City Kit,
+Quaternius robots), they will be listed here even though CC0 needs no attribution.
