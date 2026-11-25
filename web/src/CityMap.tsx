@@ -33,6 +33,7 @@ interface Props {
   floodMax?: number;
   off?: string; // why the live controls are disabled ("" = enabled)
   notify?: (r: ApiResult) => void; // lets the page show 429s; default: a local notice line
+  sidebar?: ReactNode; // shown above the pipeline in the right-hand column (presets, playback, prompt)
 }
 
 interface Overlay {
@@ -57,7 +58,7 @@ declare global {
   }
 }
 
-export function CityMap({ state, api, view = "2d", onViewFail, floodMax = 100, off = "", notify: report }: Props) {
+export function CityMap({ state, api, view = "2d", onViewFail, floodMax = 100, off = "", notify: report, sidebar }: Props) {
   const host = useRef<HTMLDivElement>(null);
   const stateRef = useRef(state);
   stateRef.current = state; // the renderer reads the latest store state each frame
@@ -127,38 +128,53 @@ export function CityMap({ state, api, view = "2d", onViewFail, floodMax = 100, o
 
   return (
     <div className="town">
-      <div className="map-wrap">
-        {view === "2d" ? (
-          <div className="map" ref={host} data-testid="map" />
-        ) : (
-          <div className="map map3d" data-testid="map3d">
-            <Boundary3D onFail={(why) => onViewFail?.(why)}>
-              <Suspense fallback={<p className="muted loading3d">Loading the 3D city…</p>}>
-                <Scene3D model={model} onWorkerTap={onWorkerTap} />
-              </Suspense>
-            </Boundary3D>
-          </div>
+      <div className="stage">
+        <div className="map-wrap">
+          {view === "2d" ? (
+            <div className="map" ref={host} data-testid="map" />
+          ) : (
+            <div className="map map3d" data-testid="map3d">
+              <Boundary3D onFail={(why) => onViewFail?.(why)}>
+                <Suspense fallback={<p className="muted loading3d">Loading the 3D city…</p>}>
+                  <Scene3D model={model} onWorkerTap={onWorkerTap} />
+                </Suspense>
+              </Boundary3D>
+            </div>
+          )}
+          <ApprovalCards approvals={overlay.approvals} api={api} notify={notify} off={off} />
+        </div>
+        <Legend summary={overlay.summary} />
+        {notice && (
+          <p className="notice" role="alert">
+            {notice}
+          </p>
         )}
-        <ApprovalCards approvals={overlay.approvals} api={api} notify={notify} off={off} />
+        <section className="live-controls" aria-labelledby="live-h">
+          <div className="section-head">
+            <h2 id="live-h">Live controls</h2>
+            {off && <span className="tag">needs the live backend</span>}
+          </div>
+          <p className="muted">
+            Break things on purpose: kill a worker, raise the failure rate or flood the queue, then replay
+            what lands in the dead-letter queue.
+          </p>
+          <div className="panels">
+            <ChaosPanel
+              api={api}
+              workerIds={overlay.workerIds}
+              floodMax={floodMax}
+              serverRate={overlay.failureRate}
+              notify={notify}
+              off={off}
+            />
+            <DeadLetters jobs={overlay.deadJobs} api={api} notify={notify} off={off} />
+          </div>
+        </section>
       </div>
-      <Legend summary={overlay.summary} />
-      {notice && (
-        <p className="notice" role="alert">
-          {notice}
-        </p>
-      )}
-      {view === "3d" && <PipelinePanel model={model} />}
-      <div className="panels">
-        <ChaosPanel
-          api={api}
-          workerIds={overlay.workerIds}
-          floodMax={floodMax}
-          serverRate={overlay.failureRate}
-          notify={notify}
-          off={off}
-        />
-        <DeadLetters jobs={overlay.deadJobs} api={api} notify={notify} off={off} />
-      </div>
+      <aside className="side">
+        {sidebar}
+        {view === "3d" && <PipelinePanel model={model} />}
+      </aside>
     </div>
   );
 }
