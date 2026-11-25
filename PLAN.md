@@ -37,8 +37,9 @@
 Live URL; a prompt produces a plan and agents visibly work; kill-worker test passes in CI; benchmark numbers in README; demo works without Gemini quota (mock fallback).
 
 ## Step 11: "build the town" 3D view (three.js)
-Status: Phase A and Phase B slices 1 to 3 are merged (#18). Still open: the Foreman turning toward the
-latest event, snap-when-behind for 4x replay, Playwright e2e, and Phase C (performance, fallbacks, docs). The design brief file (`docs/reference/design-brief.md`) never arrived, so
+Status: Phase A and Phase B slices 1 to 3 are merged (#18). Slice 4 (agents visibly build: job.progress,
+build time, cottages, hammering robots, Foreman turning, night palette) is done. Still open: snap-when-behind
+for 4x replay, Playwright e2e for the 3D view, and Phase C (performance, fallbacks, docs). The design brief file (`docs/reference/design-brief.md`) never arrived, so
 this follows the written change request and the concept images; where a value was not given (walking
 speed and so on) the plan says so and it is easy to change.
 
@@ -160,3 +161,11 @@ Slice 3 (done): `PipelinePanel` (DOM, under the map in 3D) lists each stage with
 and shows a completion banner "Town built in 10.4s: 4 tasks, 7 retries" from `goal.started` and
 `goal.succeeded` timestamps; a "Town built!" flag appears over the Foreman. The model now counts
 retries. No celebration animation: it would not come from any event, so it was left out.
+
+Slice 4 (done): agents visibly build the town. Engine: a goal's task job takes `TASK_BUILD_SECONDS`
+(4 s) on the mock and reports `job.progress` at 25/50/75%, written only while the worker still owns
+the running job; a failing attempt reports one step and stops. Town: walls rise inside a wooden
+scaffold to the reported progress, the roof drops on and the windows light up on `task.succeeded`,
+a retry knocks the walls back down, robots walk at 7 m/s, stand beside their building and hammer,
+the Foreman turns toward the latest event, and the lamps brighten when the goal succeeds. Night
+palette after the owner's mockup. Recorded traces re-recorded with progress events.

@@ -272,3 +272,42 @@ worker, start a fresh worker, approve the last task. The numbered captions are a
 the script only. Frames come from a CDP screencast (JPEG plus real timestamps) rather than
 Playwright's `recordVideo`, whose low-bitrate VP8 smeared the 3D scene. When the map changes,
 rerun the script and ffmpeg.
+
+## Agents visibly build the town (job.progress)
+**The town finishes because the work finishes, not because of an animation.** Before this, a mock
+task job took 0.5 to 1.5 s and a robot needed about 4 s to walk to its zone, so most buildings
+popped up before their robot arrived. Now a goal's task job takes `TASK_BUILD_SECONDS` (default 4 s)
+on the mock provider, robots walk at 7 m/s (about 2 s to any zone), and the last roof lands on the
+last `task.succeeded`, which is the event that completes the goal. Floods, chaos jobs and the
+planner job are not buildings and stay fast. Real Gemini calls take their own time.
+
+**Progress is a real event, not a time estimate.** While a task job runs, the worker writes
+`job.progress {job_id, worker, percent}` at 25, 50 and 75% (100% is `job.succeeded`). The walls of
+the building rise to that height inside a wooden scaffold; the roof drops on and the windows light
+up only on success. A UI timer could have faked the same picture, but then the height would be a
+guess; with the event, "the building is half built" means "the worker said it is half done", and a
+recording replays exactly what the engine did. Gemini gives no partial progress, so a real call
+goes from scaffold to built in one step.
+
+**Progress is cosmetic, so it guards nothing.** It is written in its own small statement, outside
+the completion transaction, and only `WHERE` the job is still `running` and `locked_by` this worker,
+so a worker that lost its job (killed and recovered elsewhere, or beaten by another delivery) cannot
+report on it. Delivery stays at-least-once: a duplicate or late progress event is harmless because
+the town model only ever raises a building within an attempt (`max`), and `job.started`,
+`job.recovered`, `job.retry_scheduled` and `job.dead` reset it to the ground. A page that connects
+mid-job can now place the job's robot from its next progress event (the snapshot has no job-to-task
+link).
+
+**A failing attempt stops early.** A real provider answers 429/500 without doing the work, so a
+mock call that is going to fail reports one step (the scaffold goes up) and then fails, instead of
+building to 75% first. That keeps the retries recording at 25 s instead of 52 s.
+
+**Cost on the live demo.** Three extra events per task attempt, about 15 per goal. With the 30
+goals per day cap that is under 500 extra Redis stream writes a day, well inside the budget guard.
+
+**Look: night palette, cottages, still cheap.** The owner's mockup set the mood (night, lavender
+accent, warm windows, low-poly cottages, scaffolds). The scene keeps the same layout and budgets:
+a cottage is a wall box, a door, five windows sharing one material, a gable roof (a 3-sided prism)
+and a chimney; lamps are one instanced mesh that brightens when the goal succeeds. No point
+lights, no post-processing. The Foreman is now its own mesh and turns toward the building the
+latest event was about.
