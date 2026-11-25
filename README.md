@@ -5,7 +5,7 @@ task graph, and workers ("agents") process it through Redis Streams with retries
 queue, crash recovery and human approval gates. Every move on the map is a real event from the
 backend, and you can kill workers, break the provider and watch the system recover.
 
-**Live demo:** _add the Vercel URL here after deploying (see [docs/DEPLOY.md](docs/DEPLOY.md))._
+**Live demo:** [agent-town-delta.vercel.app](https://agent-town-delta.vercel.app) (how it is hosted: [docs/DEPLOY.md](docs/DEPLOY.md)).
 The site opens on a recorded trace from the real engine, so it works even while the free backend
 sleeps, and switches to live when the backend wakes.
 
