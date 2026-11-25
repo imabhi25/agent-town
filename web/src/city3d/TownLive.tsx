@@ -15,7 +15,7 @@ import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { C, ZONE_COLORS } from "./palette3d";
-import { LAYOUT, type SlotSpec } from "./town";
+import { LAYOUT, type SlotSpec, zoneLabelAt } from "./town";
 import type { BuildingStatus, TaskView, TownModel, WorkerView } from "./townModel";
 import { Walker, targetNode } from "./walker";
 
@@ -37,7 +37,7 @@ const STATE_COLOR: Record<BuildingStatus, string> = {
   dead: "#e8707a",
 };
 
-const PITCH = 0.55; // roof height relative to a 60 degree gable: lower reads as a cottage
+const PITCH = 0.8; // roof height relative to a 60 degree gable: steep, like the mockup's cottages
 const blend = (a: string, b: string, t: number) => `#${new THREE.Color(a).lerp(new THREE.Color(b), t).getHexString()}`;
 
 /** "retry 2" with the seconds left when the clock agrees with the event time (live, or 1x replay). */
@@ -78,8 +78,8 @@ function Building({ task, slot, color }: { task: TaskView; slot: SlotSpec; color
   const built0 = task.status === "succeeded";
   const anim = useRef({ wall: built0 ? 1 : 0, roof: built0 ? 1 : 0, glow: built0 ? 1 : 0 });
   const s = slot.size;
-  const w = s * 0.72; // wall footprint
-  const h = s * 0.7; // wall height
+  const w = s * 0.92; // wall footprint
+  const h = s * 0.72; // wall height
   const wantWall = wallTarget(task);
   const done = task.status === "succeeded";
   useFrame((_, dt) => {
@@ -102,8 +102,8 @@ function Building({ task, slot, color }: { task: TaskView; slot: SlotSpec; color
   });
   const edge = STATE_COLOR[task.status];
   const e = s / 2 - 0.06;
-  const wallColor = blend(C.wall, color, 0.22);
-  const roofColor = blend(C.roof, color, 0.12);
+  const wallColor = blend(C.wall, color, 0.12);
+  const roofColor = blend(C.roof, color, 0.08);
   const rr = (w / 2 + 0.14) / 0.866; // gable radius so the eaves overhang the walls
   const post = h + 0.35;
   return (
@@ -112,6 +112,12 @@ function Building({ task, slot, color }: { task: TaskView; slot: SlotSpec; color
         <boxGeometry args={[s, 0.07, s]} />
         <meshStandardMaterial color={task.status === "dead" ? "#5b5262" : C.ghost} roughness={0.9} flatShading />
       </mesh>
+      {/* a stone footing, there from the moment work starts */}
+      {task.status !== "planned" && task.status !== "dead" && (
+        <mesh geometry={GEO.box} position={[0, 0.2, 0]} scale={[w + 0.08, 0.14, w + 0.08]} receiveShadow>
+          <meshStandardMaterial color={C.stone} roughness={0.95} flatShading />
+        </mesh>
+      )}
       {[[0, -e, s, 0.1], [0, e, s, 0.1], [-e, 0, 0.1, s], [e, 0, 0.1, s]].map(([x, z, ww, d], i) => (
         <mesh key={i} position={[x, 0.13, z]}>
           <boxGeometry args={[ww, 0.1, d]} />
@@ -123,8 +129,17 @@ function Building({ task, slot, color }: { task: TaskView; slot: SlotSpec; color
         <mesh geometry={GEO.box} position={[0, h / 2, 0]} scale={[w, h, w]} castShadow receiveShadow>
           <meshStandardMaterial color={wallColor} roughness={0.85} flatShading />
         </mesh>
-        <mesh geometry={GEO.box} position={[0, h * 0.27, w / 2 + 0.01]} scale={[w * 0.2, h * 0.54, 0.03]}>
-          <meshStandardMaterial color="#5a3d33" roughness={0.9} />
+        <mesh geometry={GEO.box} position={[0, h * 0.3, w / 2 + 0.01]} scale={[w * 0.2, h * 0.6, 0.03]}>
+          <meshStandardMaterial color={C.door} roughness={0.9} />
+        </mesh>
+        {/* timber framing: corner posts and a beam under the eaves */}
+        {[[-1, 1], [1, 1], [-1, -1], [1, -1]].map(([sx, sz], i) => (
+          <mesh key={`b${i}`} geometry={GEO.box} position={[sx * (w / 2 - 0.02), h / 2, sz * (w / 2 - 0.02)]} scale={[0.07, h, 0.07]}>
+            <meshStandardMaterial color={C.timberFrame} roughness={0.9} flatShading />
+          </mesh>
+        ))}
+        <mesh geometry={GEO.box} position={[0, h - 0.04, 0]} scale={[w + 0.03, 0.07, w + 0.03]}>
+          <meshStandardMaterial color={C.timberFrame} roughness={0.9} flatShading />
         </mesh>
         {[[-1, 1], [1, 1], [-1, -1], [1, -1], [0, -1]].map(([sx, sz], i) => (
           <mesh key={i} geometry={GEO.box} material={glass} position={[sx * w * 0.27, h * 0.58, sz * (w / 2 + 0.01)]} scale={[w * 0.22, h * 0.3, 0.03]} />
@@ -135,9 +150,11 @@ function Building({ task, slot, color }: { task: TaskView; slot: SlotSpec; color
         <mesh geometry={GEO.gable} position={[0, rr * 0.5 * PITCH, 0]} scale={[w + 0.28, rr * PITCH, rr]} castShadow>
           <meshStandardMaterial color={roofColor} roughness={0.8} flatShading />
         </mesh>
-        <mesh geometry={GEO.box} position={[w * 0.25, rr * PITCH, -w * 0.2]} scale={[0.16, 0.55, 0.16]} castShadow>
-          <meshStandardMaterial color="#6b5a5a" roughness={0.9} flatShading />
+        <mesh geometry={GEO.box} position={[w * 0.25, rr * PITCH, -w * 0.2]} scale={[0.17, 0.6, 0.17]} castShadow>
+          <meshStandardMaterial color={C.stone} roughness={0.9} flatShading />
         </mesh>
+        {/* a dormer window in the roof, lit with the others */}
+        <mesh geometry={GEO.box} material={glass} position={[0, rr * PITCH * 0.35, rr * 0.67]} scale={[w * 0.22, h * 0.26, 0.03]} />
       </group>
       {/* wooden scaffold while a worker is on it (and while a retry waits) */}
       <group ref={scaffold} visible={false}>
@@ -314,7 +331,7 @@ export function TownLive({ model, onWorkerTap }: { model: TownModel; onWorkerTap
         const spec = LAYOUT.zones[z.zone - 1];
         const names = model.tasks.filter((t) => t.zone === z.zone).map((t) => t.name);
         return (
-          <Html key={spec.id} position={[spec.x, 3.0, spec.z]} center zIndexRange={[10, 0]} className="label3d zone">
+          <Html key={spec.id} position={zoneLabelAt(spec)} center zIndexRange={[10, 0]} className="label3d zone">
             <b className="badge" style={{ background: ZONE_COLORS[z.zone - 1] }}>{z.zone}</b>
             <strong>{names.length > 2 ? `${names[0]} +${names.length - 1}` : names.join(", ")}</strong>
             <span className="count3d">{z.built}/{z.tasks} built</span>
