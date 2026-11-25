@@ -255,3 +255,20 @@ The row lock makes two workers claiming at once take turns, so the second always
 **Counters are chips, but still one sentence.** The counters under the map are coloured chips (dead and a tripped circuit in red). Visually hidden " · " separators keep the element's text the same sentence as before, so screen readers and the existing tests read it unchanged.
 
 **Live controls are grouped and labelled.** Chaos and the dead-letter queue sit under one "Live controls" heading that says what they are for, with a tag when they need the live backend, so greyed-out buttons on a recording read as intentional, not broken.
+
+## Demo GIF
+**Recorded locally, not from the deployed site.** The live demo runs two workers with a 45 s lease
+to save free-tier Redis commands, so a crash and recovery would take most of a minute to show. The
+GIF instead runs the same engine locally with the mock planner and mock LLM (no API spend) and
+shorter timings: 3 to 3.5 s per mock call, 1.5 s heartbeat TTL, 2.5 s lease, and the GIF plays
+at 1.2x. The code path is the
+real one: the killed worker's message stays unacknowledged, `XAUTOCLAIM` hands it to another
+worker, and the database ends with one stored result per job (checked after recording).
+
+**Scripted, so it can be re-recorded.** `web/scripts/record-demo.mjs` drives the page with
+Playwright: type a goal, wait for a worker that holds a task job (the planner job is instant, so it
+needs the same job on two polls), kill that worker, wait for the job to show up on a different
+worker, start a fresh worker, approve the last task. The numbered captions are an overlay added by
+the script only. Frames come from a CDP screencast (JPEG plus real timestamps) rather than
+Playwright's `recordVideo`, whose low-bitrate VP8 smeared the 3D scene. When the map changes,
+rerun the script and ffmpeg.

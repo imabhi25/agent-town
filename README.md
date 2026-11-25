@@ -9,8 +9,11 @@ backend, and you can kill workers, break the provider and watch the system recov
 The site opens on a recorded trace from the real engine, so it works even while the free backend
 sleeps, and switches to live when the backend wakes.
 
-<!-- TODO: demo GIF. Record the map (docs/city-map.png is a still): ![demo](docs/demo.gif) -->
-![The city map](docs/city-map.png)
+![Demo: a goal runs on the city map, a worker is killed mid-job, another worker reclaims the job, and the goal finishes after approval](docs/demo.gif)
+
+_A goal planned by the mock planner, a worker killed mid-job and its job reclaimed by another worker,
+then a human approval, on the 3D town and the current page layout. Recorded locally with shortened leases and played at 1.2x;
+re-record with [web/scripts/record-demo.mjs](web/scripts/record-demo.mjs)._
 
 ## Architecture
 ```mermaid
