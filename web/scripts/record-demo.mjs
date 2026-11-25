@@ -57,15 +57,15 @@ const state = async () => (await fetch("http://localhost:8000/state")).json();
   await p.getByPlaceholder('e.g. Plan a weekend in Lisbon').fill('Plan a weekend in Lisbon');
   await p.waitForTimeout(600);
   await p.getByRole('button', { name: 'Plan it' }).click(); mark('submitted');
-  // wait for the first task to be picked up, then kill that worker
+  // Wait for stage 2 (two tasks in parallel), then kill one of those workers at once: each build
+  // takes TASK_BUILD_SECONDS (3 s), so the job is surely still running when the kill lands.
   let victim = null, jid = null;
-  // a task job runs about 3 s; the planner job is instant, so require the same job on two polls 400 ms apart
-  for (let i = 0; i < 100 && !victim; i++) {
-    const a = await state(); await p.waitForTimeout(400); const b2 = await state();
-    const w = b2.workers.find((w) => w.job_id && a.workers.some((x) => x.id === w.id && x.job_id === w.job_id));
-    if (w) { victim = w.id; jid = w.job_id; }
+  for (let i = 0; i < 200 && !victim; i++) {
+    const s = await state();
+    const busy = s.workers.filter((w) => w.job_id);
+    if (busy.length >= 2) { victim = busy[0].id; jid = busy[0].job_id; } else await p.waitForTimeout(100);
   }
-  await cap('2. Workers pick up tasks through Redis Streams'); await p.waitForTimeout(300);
+  await cap('2. Workers pick up tasks through Redis Streams and build them'); await p.waitForTimeout(1000);
   await p.locator('section[aria-labelledby="chaos-h"] select').selectOption(victim);
   await p.getByRole('button', { name: 'Kill worker' }).click(); mark('killed ' + victim); await cap('3. Kill ' + victim + ' mid-job: its message stays unacknowledged');
   // wait until the job is reclaimed by another worker
@@ -76,9 +76,9 @@ const state = async () => (await fetch("http://localhost:8000/state")).json();
   await p.getByRole('button', { name: 'Start worker' }).click(); mark('started'); await cap('5. Start a fresh worker');
   const approve = p.locator('.approvals button.primary').first();
   await approve.waitFor({ timeout: 20000 }); await cap('6. The last task waits for a human to approve it'); await p.waitForTimeout(1100);
-  await approve.click(); mark('approved'); await cap('7. Approved: the last task runs');
+  await approve.click(); mark('approved'); await cap('7. Approved: the last building goes up');
   for (let i = 0; i < 100; i++) { const s = await state(); if (s.tasks.length && s.tasks.every((t) => t.status === 'succeeded')) break; await p.waitForTimeout(100); }
-  await p.waitForTimeout(400); await cap('Goal done: one stored result per task, none duplicated');
+  await p.waitForTimeout(400); await cap('Goal done, town built: one stored result per task');
   await p.waitForTimeout(2200); mark('end');
   await cdp.send('Page.stopScreencast');
   const list = ['ffconcat version 1.0'];
