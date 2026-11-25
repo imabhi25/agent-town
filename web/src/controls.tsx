@@ -1,5 +1,6 @@
-// The bar above the map: status pill, preset buttons, playback controls and the prompt box.
+// Map status and sidebar controls.
 import { useState } from "react";
+import { Icon } from "./Icon";
 import { PILL } from "./health";
 import { SPEEDS } from "./replay";
 import type { UiState } from "./controller";
@@ -17,8 +18,8 @@ interface Actions {
 
 export function StatusPill({ ui }: { ui: UiState }) {
   return (
-    <span className={`pill ${ui.health}`} role="status" data-testid="pill">
-      {PILL[ui.health]}
+    <span className={`pill ${ui.health}`} role="status" title={PILL[ui.health]} data-testid="pill">
+      {ui.health === "waking" ? "Connecting" : ui.health === "offline" ? "Backend offline" : "Backend connected"}
     </span>
   );
 }
@@ -45,59 +46,60 @@ export function ModeBar({ ui, a }: { ui: UiState; a: Actions }) {
 export function PresetPicker({ ui, a }: { ui: UiState; a: Actions }) {
   const current = ui.presets.find((p) => p.preset === ui.preset);
   return (
-    <section className="panel presets" aria-labelledby="presets-h">
-      <h2 id="presets-h">Recorded presets</h2>
+    <section className="presets" aria-labelledby="presets-h">
+      <h3 id="presets-h">Recorded presets</h3>
       {ui.presets.length === 0 && !ui.error && <p className="muted">No recorded presets found.</p>}
       <div className="row" role="group" aria-label="Preset traces">
         {ui.presets.map((p) => (
           <button
             key={p.preset}
             aria-pressed={ui.mode === "recorded" && ui.preset === p.preset}
+            title={p.description}
             onClick={() => a.selectPreset(p.preset)}
           >
-            {p.name}
+            <Icon name="map" />{p.name}<Icon name="chevron" />
           </button>
         ))}
       </div>
-      {ui.mode === "recorded" && current && <p className="muted">{current.description}</p>}
-      {ui.mode === "recorded" && <Playback ui={ui} a={a} />}
+      {ui.mode === "recorded" && current && <p className="sr-only">{current.description}</p>}
       {ui.loading && <p className="muted" role="status">Loading the trace…</p>}
       {ui.error && <p className="notice" role="alert">{ui.error}</p>}
     </section>
   );
 }
 
-function Playback({ ui, a }: { ui: UiState; a: Actions }) {
+export function Playback({ ui, a }: { ui: UiState; a: Actions }) {
   const playing = ui.play === "playing";
+  const disabled = ui.loading || ui.total === 0;
   return (
-    <div className="row playback" role="group" aria-label="Playback">
-      <button onClick={playing ? a.pause : a.play} disabled={ui.loading || ui.total === 0}>
-        {playing ? "Pause" : ui.play === "ended" ? "Replay" : "Play"}
-      </button>
-      <button onClick={a.restart} disabled={ui.loading || ui.total === 0}>
-        Restart
-      </button>
-      <div role="group" aria-label="Speed" className="speeds">
-        {SPEEDS.map((s) => (
-          <button key={s} aria-pressed={ui.speed === s} onClick={() => a.setSpeed(s)}>
-            {s}x
-          </button>
-        ))}
+    <section className="panel playback" role="group" aria-labelledby="playback-h">
+      <h2 id="playback-h">Playback</h2>
+      <div className="playback-buttons">
+        <button className="play-toggle" onClick={playing ? a.pause : a.play} disabled={disabled}>
+          <Icon name={playing ? "pause" : "play"} />
+          {playing ? "Pause" : ui.play === "ended" ? "Replay" : "Play"}
+        </button>
+        <button onClick={a.restart} disabled={disabled}>
+          <Icon name="restart" /> Restart
+        </button>
+        <select aria-label="Playback speed" value={ui.speed} disabled={disabled} onChange={(e) => a.setSpeed(Number(e.target.value))}>
+          {SPEEDS.map((speed) => <option key={speed} value={speed}>{speed}×</option>)}
+        </select>
       </div>
-      <progress max={ui.total || 1} value={ui.delivered} aria-label="Trace progress" />
-      <span className="muted">
-        {ui.delivered}/{ui.total} events
-      </span>
-    </div>
+      <div className="playback-progress">
+        <progress max={ui.total || 1} value={ui.delivered} aria-label="Trace progress" />
+        <span className="muted">{ui.delivered}/{ui.total} events</span>
+      </div>
+    </section>
   );
 }
 
-export function PromptBox({ ui, a }: { ui: UiState; a: Actions }) {
+export function PromptBox({ ui, a, unavailable = "" }: { ui: UiState; a: Actions; unavailable?: string }) {
   const [text, setText] = useState("");
-  const off = ui.liveOffReason;
+  const off = ui.liveOffReason || unavailable;
   return (
     <form
-      className="panel prompt"
+      className="prompt"
       aria-label="Send a goal"
       title={off || undefined}
       onSubmit={(e) => {
@@ -106,19 +108,21 @@ export function PromptBox({ ui, a }: { ui: UiState; a: Actions }) {
       }}
     >
       <label>
-        Your own goal
-        <input
+        <span className="sr-only">Your own goal</span>
+        <textarea
+          rows={2}
+          aria-describedby={off ? "goal-availability" : undefined}
           value={text}
           maxLength={500}
           disabled={!!off}
-          placeholder="e.g. Plan a weekend in Lisbon"
+          placeholder="Plan a weekend in Lisbon…"
           onChange={(e) => setText(e.target.value)}
         />
       </label>
       <button className="primary" type="submit" disabled={!!off || !text.trim()}>
-        Plan it
+        <Icon name="play" /> Run goal
       </button>
-      {off && <p className="muted off">{off}</p>}
+      {off && <p className="sr-only" id="goal-availability">{off}</p>}
     </form>
   );
 }

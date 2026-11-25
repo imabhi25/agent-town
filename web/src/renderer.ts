@@ -94,7 +94,7 @@ export class CityRenderer {
     const square = this.squareTexture();
     const q = BUILDINGS.queue;
     for (let i = 0; i < QUEUE_TOKENS; i++) {
-      const s = this.token(square, PALETTE.ink, q.x - q.w / 2 + 14 + (i % 6) * 22, q.y - 4 + Math.floor(i / 6) * 22);
+      const s = this.token(square, 0xe5bb81, q.x - q.w / 2 + 14 + (i % 6) * 22, q.y - 4 + Math.floor(i / 6) * 22);
       this.queueTokens.push(s);
     }
     const d = BUILDINGS.dlq;
@@ -141,7 +141,7 @@ export class CityRenderer {
     const g = new Graphics()
       .roundRect(-b.w / 2, -b.h / 2, b.w, b.h, 18)
       .fill(PALETTE[b.id])
-      .stroke({ width: 3, color: PALETTE.ink, alpha: 0.35 });
+      .stroke({ width: 3, color: PALETTE.label, alpha: 0.15 });
     const c = new Container();
     c.addChild(g);
     c.position.set(b.x, b.y);
@@ -157,7 +157,7 @@ export class CityRenderer {
   private text(key: string, value: string, x: number, y: number, size: number, anchorX = 0, bold = false): Text {
     const t = new Text({
       text: value,
-      style: { fontFamily: FONT, fontSize: size, fill: PALETTE.ink, fontWeight: bold ? "700" : "500" },
+      style: { fontFamily: FONT, fontSize: size, fill: PALETTE.label, fontWeight: bold ? "700" : "500" },
     });
     t.anchor.set(anchorX, 0.5);
     t.position.set(x, y);

@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { cameraPosition, fitDistance, zoomRange } from "./camera";
+import { AZIMUTH, ELEVATION, cameraPosition, fitDistance, zoomRange } from "./camera";
 
 describe("camera fit", () => {
-  it("fits the 40 x 30 board at about 85% of the width on a 1440 x 900 viewport", () => {
-    const d = fitDistance(40, 30, 1066 / 600); // the map is a 16:9 box about 1066 px wide
-    expect(d).toBeGreaterThan(40);
-    expect(d).toBeLessThan(60);
+  it("fits the diagonal 40 x 30 board within a desktop viewport", () => {
+    const d = fitDistance(40, 30, 952 / 545);
+    expect(d).toBeGreaterThan(60);
+    expect(d).toBeLessThan(75);
   });
   it("moves back on a narrow (phone) viewport and in on a wide one", () => {
     expect(fitDistance(40, 30, 0.6)).toBeGreaterThan(fitDistance(40, 30, 1.78));
@@ -32,10 +32,10 @@ describe("camera fit", () => {
     expect(min / fit).toBeCloseTo(0.45);
     expect(max / fit).toBeCloseTo(1.15);
   });
-  it("looks down at 45 degrees", () => {
+  it("looks diagonally down without changing the distance", () => {
     const [x, y, z] = cameraPosition(40);
-    expect(x).toBe(0);
-    expect(Math.atan2(y, z) * (180 / Math.PI)).toBeCloseTo(45);
-    expect(Math.hypot(y, z)).toBeCloseTo(40);
+    expect(Math.atan2(x, z) * (180 / Math.PI)).toBeCloseTo(AZIMUTH);
+    expect(Math.atan2(y, Math.hypot(x, z)) * (180 / Math.PI)).toBeCloseTo(ELEVATION);
+    expect(Math.hypot(x, y, z)).toBeCloseTo(40);
   });
 });

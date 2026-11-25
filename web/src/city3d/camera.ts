@@ -2,7 +2,8 @@ import { PerspectiveCamera, Vector3 } from "three";
 
 // Camera maths, pure so it is unit tested without WebGL.
 export const FOV = 35; // vertical, degrees
-export const ELEVATION = 45; // degrees above the horizon
+export const ELEVATION = 39; // degrees above the horizon
+export const AZIMUTH = 34; // diagonal view of the board, measured from +z
 
 /**
  * Distance at which the whole board fits. The board is projected through the real camera (so the
@@ -38,8 +39,10 @@ export function fitDistance(boardW: number, boardD: number, aspect: number, fill
 /** Zoom limits are relative to the fit distance, so any screen size zooms the same amount. */
 export const zoomRange = (fit: number) => ({ min: fit * 0.45, max: fit * 1.15 });
 
-/** Camera position for a given distance, looking at the origin from ELEVATION degrees up, from +z. */
+/** Camera position for a given distance, looking toward the center of the board. */
 export function cameraPosition(distance: number): [number, number, number] {
   const e = (ELEVATION * Math.PI) / 180;
-  return [0, Math.sin(e) * distance, Math.cos(e) * distance];
+  const a = (AZIMUTH * Math.PI) / 180;
+  const horizontal = Math.cos(e) * distance;
+  return [Math.sin(a) * horizontal, Math.sin(e) * distance, Math.cos(a) * horizontal];
 }

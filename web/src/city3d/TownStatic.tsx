@@ -49,8 +49,8 @@ function useStaticGeometry(plan: Plan, preview: boolean): { geo: THREE.BufferGeo
     // zone discs: a cream footpath rim, then grass tinted with the zone colour (pale when unused)
     zones.forEach((z, i) => {
       const used = active.has(z.stage);
-      b.cyl(z.r + 0.3, z.r + 0.3, 0.035, 40, C.foot, [z.x, 0.0175, z.z]);
-      b.cyl(z.r, z.r, 0.04, 40, used ? blend(C.zoneGrass, ZONE_COLORS[i], 0.72) : C.zoneGrass, [z.x, 0.02, z.z]);
+      if (used) b.cyl(z.r + 0.3, z.r + 0.3, 0.035, 40, C.foot, [z.x, 0.0175, z.z]);
+      b.cyl(z.r, z.r, 0.04, 40, used ? blend(C.zoneGrass, ZONE_COLORS[i], 0.24) : C.zoneGrass, [z.x, 0.02, z.z]);
     });
 
     // roads: a curb under the surface, footpaths on top
@@ -72,8 +72,9 @@ function useStaticGeometry(plan: Plan, preview: boolean): { geo: THREE.BufferGeo
 
     // plaza: disc, the Foreman's podium, idle pads, a flagpole
     b.cyl(plaza.r, plaza.r, 0.05, 40, C.plaza, [plaza.x, 0.025, plaza.z]);
-    b.cyl(plaza.podium_r, plaza.podium_r + 0.1, 0.3, 16, "#d8cfbd", [plaza.foreman[0], 0.15, plaza.foreman[1]]);
-    plaza.pads.forEach(([px, pz]) => b.cyl(0.45, 0.45, 0.03, 14, "#ddd5c3", [px, 0.065, pz]));
+    b.cyl(plaza.podium_r + 0.28, plaza.podium_r + 0.4, 0.16, 16, "#958493", [plaza.foreman[0], 0.08, plaza.foreman[1]]);
+    b.cyl(plaza.podium_r, plaza.podium_r + 0.1, 0.22, 16, "#bc9895", [plaza.foreman[0], 0.19, plaza.foreman[1]]);
+    plaza.pads.forEach(([px, pz]) => b.cyl(0.45, 0.45, 0.03, 14, "#aa8793", [px, 0.065, pz]));
     robot(b, plaza.foreman[0], plaza.foreman[1], 0.3, 1.7, "#7fb5ef", true);
     b.box([0.07, 3.1, 0.07], "#b8b1c2", [plaza.foreman[0] + 1.3, 1.55, plaza.foreman[1] - 0.6]);
     b.box([0.9, 0.5, 0.04], "#f2c14e", [plaza.foreman[0] + 1.75, 2.8, plaza.foreman[1] - 0.6]);
@@ -88,7 +89,7 @@ function useStaticGeometry(plan: Plan, preview: boolean): { geo: THREE.BufferGeo
     // zones: signpost at the hub, ghost foundations for the planned tasks
     zones.forEach((z, i) => {
       b.box([0.08, 1.5, 0.08], "#b8b1c2", [z.x, 0.75, z.z]);
-      b.box([0.7, 0.36, 0.05], ZONE_COLORS[i], [z.x + 0.4, 1.3, z.z]);
+      b.box([0.7, 0.36, 0.05], active.has(z.stage) ? ZONE_COLORS[i] : "#777083", [z.x + 0.4, 1.3, z.z]);
       // Phase A preview only: ghost foundations. Live, each building draws its own (it changes with status).
       const used = preview ? plan.find((p) => p.stage === z.stage) : undefined;
       z.slots.slice(0, used?.tasks ?? 0).forEach((s) => {
@@ -105,15 +106,15 @@ function useStaticGeometry(plan: Plan, preview: boolean): { geo: THREE.BufferGeo
     // lamps and barrier posts
     for (const p of LAYOUT.props) {
       if (p.kind !== "lamp") continue;
-      b.cyl(0.05, 0.06, 1.4, 6, "#8f8aa0", [p.x, 0.7, p.z]);
-      b.sphere(0.16, "#ffe8a8", [p.x, 1.5, p.z]);
+      b.cyl(0.035, 0.07, 1.48, 6, "#534355", [p.x, 0.74, p.z]);
+      b.cyl(0.06, 0.24, 0.19, 6, "#534355", [p.x, 1.67, p.z]);
     }
     return { geo: b.build(), triangles: b.triangles };
   }, [plan, preview]);
 }
 
 /** Instanced props of one kind: one draw call for all trees' crowns, one for trunks, and so on. */
-function Instances({ props, geometry, color, colors, y, quality, limit }: {
+function Instances({ props, geometry, color, colors, y, quality, limit, emissive }: {
   props: PropSpec[];
   geometry: THREE.BufferGeometry;
   color?: string;
@@ -121,6 +122,7 @@ function Instances({ props, geometry, color, colors, y, quality, limit }: {
   y: (p: PropSpec) => number;
   quality: Quality;
   limit?: number;
+  emissive?: string;
 }) {
   const ref = useRef<THREE.InstancedMesh>(null);
   const list = quality === "low" && limit !== undefined ? props.slice(0, limit) : props;
@@ -138,7 +140,7 @@ function Instances({ props, geometry, color, colors, y, quality, limit }: {
   }, [list, colors, y]);
   return (
     <instancedMesh ref={ref} args={[geometry, undefined, Math.max(1, props.length)]} castShadow receiveShadow>
-      <meshStandardMaterial color={color ?? "#ffffff"} roughness={0.9} flatShading />
+      <meshStandardMaterial color={color ?? "#ffffff"} emissive={emissive} emissiveIntensity={emissive ? 0.9 : 0} roughness={0.9} flatShading />
     </instancedMesh>
   );
 }
@@ -146,7 +148,9 @@ function Instances({ props, geometry, color, colors, y, quality, limit }: {
 function Decoration({ quality }: { quality: Quality }) {
   const by = (k: string) => LAYOUT.props.filter((p) => p.kind === k);
   const g = useMemo(() => ({
-    crown: new THREE.IcosahedronGeometry(0.62, 1),
+    crown: new THREE.ConeGeometry(0.73, 1.4, 7),
+    treetop: new THREE.ConeGeometry(0.50, 1.14, 7),
+    lantern: new THREE.CylinderGeometry(0.17, 0.12, 0.26, 6),
     trunk: new THREE.CylinderGeometry(0.07, 0.1, 0.6, 6),
     bush: new THREE.IcosahedronGeometry(0.4, 0),
     rock: new THREE.IcosahedronGeometry(0.4, 0).scale(1, 0.6, 0.8),
@@ -156,14 +160,16 @@ function Decoration({ quality }: { quality: Quality }) {
   const trees = by("tree");
   return (
     <>
-      <Instances props={trees} geometry={g.crown} colors={["#8fd3c4", "#a8dca0", "#7cc7b8"]} y={(p) => 1.05 * p.s} quality={quality} limit={LOW_TREES} />
-      <Instances props={trees} geometry={g.trunk} color="#b89f86" y={(p) => 0.3 * p.s} quality={quality} limit={LOW_TREES} />
+      <Instances props={trees} geometry={g.crown} colors={["#435d52", "#536650", "#40605b"]} y={(p) => 1.04 * p.s} quality={quality} limit={LOW_TREES} />
+      <Instances props={trees} geometry={g.treetop} colors={["#557464", "#677a5c", "#4c776d"]} y={(p) => 1.52 * p.s} quality={quality} limit={LOW_TREES} />
+      <Instances props={trees} geometry={g.trunk} color="#745447" y={(p) => 0.3 * p.s} quality={quality} limit={LOW_TREES} />
+      <Instances props={by("lamp")} geometry={g.lantern} color={C.window} emissive={C.window} y={() => 1.52} quality={quality} />
       {quality === "high" && (
         <>
-          <Instances props={by("bush")} geometry={g.bush} colors={["#8bcf7f", "#9bd98b"]} y={(p) => 0.3 * p.s} quality={quality} />
-          <Instances props={by("rock")} geometry={g.rock} color="#b9b4c2" y={(p) => 0.2 * p.s} quality={quality} />
+          <Instances props={by("bush")} geometry={g.bush} colors={["#5c7359", "#687c60"]} y={(p) => 0.3 * p.s} quality={quality} />
+          <Instances props={by("rock")} geometry={g.rock} color="#817583" y={(p) => 0.2 * p.s} quality={quality} />
           <Instances props={by("flower")} geometry={g.flower} colors={["#f5b5b5", "#f9d9a8", "#cdb4f6", "#ffffff"]} y={() => 0.15} quality={quality} />
-          <Instances props={by("fence")} geometry={g.fence} color="#e3d6bd" y={() => 0.25} quality={quality} />
+          <Instances props={by("fence")} geometry={g.fence} color="#957581" y={() => 0.25} quality={quality} />
         </>
       )}
     </>

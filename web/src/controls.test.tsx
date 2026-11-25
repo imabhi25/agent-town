@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApprovalCards, ChaosPanel, DeadLetters } from "./components";
 import type { UiState } from "./controller";
-import { ModeBar, PresetPicker, PromptBox, StatusPill } from "./controls";
+import { ModeBar, Playback, PresetPicker, PromptBox, StatusPill } from "./controls";
 
 afterEach(cleanup);
 
@@ -22,9 +22,9 @@ const actions = () => ({
 
 describe("status pill", () => {
   it.each([
-    ["waking", "Recorded Trace (Waking Live Backend...)"],
-    ["offline", "Recorded Trace (Live Backend Offline)"],
-    ["connected", "Live Backend Connected"],
+    ["waking", "Connecting"],
+    ["offline", "Backend offline"],
+    ["connected", "Backend connected"],
   ] as const)("%s", (health, text) => {
     render(<StatusPill ui={ui({ health })} />);
     expect(screen.getByRole("status").textContent).toBe(text);
@@ -41,24 +41,25 @@ describe("preset picker and playback", () => {
     expect(screen.getByText("all good")).toBeTruthy();
   });
 
-  it("pause, restart and speed buttons call the actions", () => {
+  it("pause, restart and speed controls call the actions", () => {
     const a = actions();
-    render(<PresetPicker ui={ui()} a={a} />);
+    render(<Playback ui={ui()} a={a} />);
     fireEvent.click(screen.getByRole("button", { name: "Pause" }));
     fireEvent.click(screen.getByRole("button", { name: "Restart" }));
-    fireEvent.click(screen.getByRole("button", { name: "4x" }));
+    const speed = screen.getByRole("combobox", { name: "Playback speed" }) as HTMLSelectElement;
+    expect(speed.value).toBe("1");
+    fireEvent.change(speed, { target: { value: "4" } });
     expect(a.pause).toHaveBeenCalled();
     expect(a.restart).toHaveBeenCalled();
     expect(a.setSpeed).toHaveBeenCalledWith(4);
-    expect(screen.getByRole("button", { name: "1x" }).getAttribute("aria-pressed")).toBe("true");
   });
 
   it("shows Play when paused and Replay when ended", () => {
     const a = actions();
-    const { rerender } = render(<PresetPicker ui={ui({ play: "paused" })} a={a} />);
+    const { rerender } = render(<Playback ui={ui({ play: "paused" })} a={a} />);
     fireEvent.click(screen.getByRole("button", { name: "Play" }));
     expect(a.play).toHaveBeenCalled();
-    rerender(<PresetPicker ui={ui({ play: "ended" })} a={a} />);
+    rerender(<Playback ui={ui({ play: "ended" })} a={a} />);
     expect(screen.getByRole("button", { name: "Replay" })).toBeTruthy();
   });
 
@@ -90,7 +91,7 @@ describe("live gating", () => {
   it("the prompt box is disabled with the reason when live is off", () => {
     render(<PromptBox ui={ui()} a={actions()} />);
     expect((screen.getByRole("textbox") as HTMLInputElement).disabled).toBe(true);
-    expect((screen.getByRole("button", { name: "Plan it" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Run goal" }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByText("The live backend is waking up.")).toBeTruthy();
   });
 
@@ -98,7 +99,7 @@ describe("live gating", () => {
     const a = actions();
     render(<PromptBox ui={ui({ mode: "live", liveOffReason: "" })} a={a} />);
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "plan a trip" } });
-    fireEvent.click(screen.getByRole("button", { name: "Plan it" }));
+    fireEvent.click(screen.getByRole("button", { name: "Run goal" }));
     expect(a.submitPrompt).toHaveBeenCalledWith("plan a trip");
   });
 
