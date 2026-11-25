@@ -6,7 +6,7 @@
 //   psql ... -c "TRUNCATE goals, tasks, jobs, job_outputs, outbox, events RESTART IDENTITY CASCADE"
 //   redis-cli FLUSHALL
 //   PLANNER=gemini EMBEDDED_WORKERS=true WORKER_COUNT=4 GEMINI_API_KEY= \
-//     MOCK_MIN_LATENCY=3.0 MOCK_MAX_LATENCY=3.5 \
+//     TASK_BUILD_SECONDS=3 \
 //     HEARTBEAT_INTERVAL=0.5 HEARTBEAT_TTL=1.5 LEASE_SECONDS=2.5 RECOVERY_INTERVAL=0.5 \
 //     uvicorn app.main:app --port 8000
 //   cd web && npm run dev

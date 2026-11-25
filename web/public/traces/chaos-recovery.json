@@ -2,7 +2,7 @@
  "preset": "chaos-recovery",
  "name": "Chaos recovery",
  "description": "A worker is killed in the middle of a job. Its heartbeat expires, another worker reclaims the job (XAUTOCLAIM) and it completes once in effect.",
- "recorded_at": "2026-11-15T23:15:04.939106Z",
+ "recorded_at": "2026-11-25T19:51:54.590197Z",
  "snapshot": {
   "type": "snapshot",
   "goals": [],
@@ -53,449 +53,581 @@
  "events": [
   {
    "id": 1,
-   "stream_id": "1794784497462-0",
+   "stream_id": "1795636299211-0",
    "type": "chaos.config",
    "payload": {
     "max_latency": 1.6,
     "min_latency": 1.0,
     "failure_rate": 0.0
    },
-   "ts": "2026-11-15T23:14:57.455609Z"
+   "ts": "2026-11-25T19:51:39.199733Z"
   },
   {
    "id": 2,
-   "stream_id": "1794784497462-1",
+   "stream_id": "1795636299212-0",
    "type": "goal.created",
    "payload": {
-    "job_id": "f1149f83-552a-44fd-a026-9ba634374b06",
-    "goal_id": "667b5fea-b22c-4d1d-bcf6-40f1a7af351c"
+    "job_id": "ff46ab55-54d2-4b7c-a11c-aaa4a726e473",
+    "goal_id": "064db388-419c-4163-8251-aa6e1d838e11"
    },
-   "ts": "2026-11-15T23:14:57.458685Z"
+   "ts": "2026-11-25T19:51:39.201725Z"
   },
   {
    "id": 3,
-   "stream_id": "1794784497524-0",
+   "stream_id": "1795636299212-1",
    "type": "chaos.flood",
    "payload": {
     "count": 4
    },
-   "ts": "2026-11-15T23:14:57.464348Z"
-  },
-  {
-   "id": 5,
-   "stream_id": "1794784497525-1",
-   "type": "job.started",
-   "payload": {
-    "job_id": "f1149f83-552a-44fd-a026-9ba634374b06",
-    "worker": "worker-3"
-   },
-   "ts": "2026-11-15T23:14:57.513009Z"
+   "ts": "2026-11-25T19:51:39.206496Z"
   },
   {
    "id": 4,
-   "stream_id": "1794784497525-0",
+   "stream_id": "1795636299264-0",
    "type": "job.started",
    "payload": {
-    "job_id": "b715e706-0a1d-44e8-befc-5294de0b4bfa",
+    "job_id": "ff46ab55-54d2-4b7c-a11c-aaa4a726e473",
+    "worker": "worker-1"
+   },
+   "ts": "2026-11-25T19:51:39.250372Z"
+  },
+  {
+   "id": 5,
+   "stream_id": "1795636299265-0",
+   "type": "job.started",
+   "payload": {
+    "job_id": "14c8d8b6-8c56-4ea6-a09e-4e5bff07b699",
     "worker": "worker-2"
    },
-   "ts": "2026-11-15T23:14:57.513704Z"
+   "ts": "2026-11-25T19:51:39.250920Z"
   },
   {
    "id": 6,
-   "stream_id": "1794784497525-2",
+   "stream_id": "1795636299265-1",
    "type": "job.started",
    "payload": {
-    "job_id": "2d7b12e8-b7e5-496e-98b9-cef3e7752738",
-    "worker": "worker-1"
+    "job_id": "a226c45a-3c1c-4a58-b749-bd53b6ef030e",
+    "worker": "worker-3"
    },
-   "ts": "2026-11-15T23:14:57.513927Z"
+   "ts": "2026-11-25T19:51:39.251123Z"
   },
   {
    "id": 7,
-   "stream_id": "1794784497533-0",
+   "stream_id": "1795636299265-2",
    "type": "job.succeeded",
    "payload": {
-    "job_id": "f1149f83-552a-44fd-a026-9ba634374b06",
-    "worker": "worker-3"
+    "job_id": "ff46ab55-54d2-4b7c-a11c-aaa4a726e473",
+    "worker": "worker-1"
    },
-   "ts": "2026-11-15T23:14:57.520116Z"
+   "ts": "2026-11-25T19:51:39.252894Z"
   },
   {
    "id": 8,
-   "stream_id": "1794784497534-0",
+   "stream_id": "1795636299265-3",
    "type": "goal.planned",
    "payload": {
     "source": "mock",
-    "goal_id": "667b5fea-b22c-4d1d-bcf6-40f1a7af351c",
+    "goal_id": "064db388-419c-4163-8251-aa6e1d838e11",
     "task_count": 4
    },
-   "ts": "2026-11-15T23:14:57.520116Z"
+   "ts": "2026-11-25T19:51:39.252894Z"
   },
   {
    "id": 9,
-   "stream_id": "1794784497534-1",
+   "stream_id": "1795636299265-4",
    "type": "task.created",
    "payload": {
     "key": "t1",
     "name": "Research",
-    "goal_id": "667b5fea-b22c-4d1d-bcf6-40f1a7af351c",
-    "task_id": "fe9fbca2-6364-4fc9-aeb5-56dcbd708a89",
+    "goal_id": "064db388-419c-4163-8251-aa6e1d838e11",
+    "task_id": "ca3e06c2-17f4-4720-94b4-5359898223a5",
     "depends_on": [],
     "needs_approval": false
    },
-   "ts": "2026-11-15T23:14:57.520116Z"
+   "ts": "2026-11-25T19:51:39.252894Z"
   },
   {
    "id": 10,
-   "stream_id": "1794784497534-2",
+   "stream_id": "1795636299265-5",
    "type": "task.created",
    "payload": {
     "key": "t2",
     "name": "Outline",
-    "goal_id": "667b5fea-b22c-4d1d-bcf6-40f1a7af351c",
-    "task_id": "33241d47-ee43-4aa1-8e03-bce6726dfe7e",
+    "goal_id": "064db388-419c-4163-8251-aa6e1d838e11",
+    "task_id": "f7b15d4b-9115-4c3f-add7-086fddd680ac",
     "depends_on": [
-     "fe9fbca2-6364-4fc9-aeb5-56dcbd708a89"
+     "ca3e06c2-17f4-4720-94b4-5359898223a5"
     ],
     "needs_approval": false
    },
-   "ts": "2026-11-15T23:14:57.520116Z"
+   "ts": "2026-11-25T19:51:39.252894Z"
   },
   {
    "id": 11,
-   "stream_id": "1794784497534-3",
+   "stream_id": "1795636299265-6",
    "type": "task.created",
    "payload": {
     "key": "t3",
     "name": "Draft",
-    "goal_id": "667b5fea-b22c-4d1d-bcf6-40f1a7af351c",
-    "task_id": "b5eb8286-f263-4849-a955-78fbc7466f26",
+    "goal_id": "064db388-419c-4163-8251-aa6e1d838e11",
+    "task_id": "fb7a1ee7-1e1b-42f5-bdba-6f43acc2a586",
     "depends_on": [
-     "fe9fbca2-6364-4fc9-aeb5-56dcbd708a89"
+     "ca3e06c2-17f4-4720-94b4-5359898223a5"
     ],
     "needs_approval": false
    },
-   "ts": "2026-11-15T23:14:57.520116Z"
+   "ts": "2026-11-25T19:51:39.252894Z"
   },
   {
    "id": 12,
-   "stream_id": "1794784497534-4",
+   "stream_id": "1795636299265-7",
    "type": "task.created",
    "payload": {
     "key": "t4",
     "name": "Review and publish",
-    "goal_id": "667b5fea-b22c-4d1d-bcf6-40f1a7af351c",
-    "task_id": "c571e872-bbb3-40f5-bb2f-078271addd93",
+    "goal_id": "064db388-419c-4163-8251-aa6e1d838e11",
+    "task_id": "9884c0a7-5978-4501-a476-52779966b8b7",
     "depends_on": [
-     "33241d47-ee43-4aa1-8e03-bce6726dfe7e",
-     "b5eb8286-f263-4849-a955-78fbc7466f26"
+     "f7b15d4b-9115-4c3f-add7-086fddd680ac",
+     "fb7a1ee7-1e1b-42f5-bdba-6f43acc2a586"
     ],
     "needs_approval": true
    },
-   "ts": "2026-11-15T23:14:57.520116Z"
+   "ts": "2026-11-25T19:51:39.252894Z"
   },
   {
    "id": 13,
-   "stream_id": "1794784497534-5",
+   "stream_id": "1795636299265-8",
    "type": "goal.started",
    "payload": {
-    "goal_id": "667b5fea-b22c-4d1d-bcf6-40f1a7af351c"
+    "goal_id": "064db388-419c-4163-8251-aa6e1d838e11"
    },
-   "ts": "2026-11-15T23:14:57.520116Z"
+   "ts": "2026-11-25T19:51:39.252894Z"
   },
   {
    "id": 14,
-   "stream_id": "1794784497534-6",
+   "stream_id": "1795636299265-9",
    "type": "task.queued",
    "payload": {
-    "job_id": "b59641f2-6868-443d-804b-b318492ae7d1",
-    "goal_id": "667b5fea-b22c-4d1d-bcf6-40f1a7af351c",
-    "task_id": "fe9fbca2-6364-4fc9-aeb5-56dcbd708a89"
+    "job_id": "3a2aaf25-fa79-4611-8f9b-2a4c481d5064",
+    "goal_id": "064db388-419c-4163-8251-aa6e1d838e11",
+    "task_id": "ca3e06c2-17f4-4720-94b4-5359898223a5"
    },
-   "ts": "2026-11-15T23:14:57.520116Z"
+   "ts": "2026-11-25T19:51:39.252894Z"
   },
   {
    "id": 15,
-   "stream_id": "1794784497535-0",
+   "stream_id": "1795636299266-0",
    "type": "job.started",
    "payload": {
-    "job_id": "e97770b5-79f9-4d15-8af5-a38618aaab09",
-    "worker": "worker-3"
+    "job_id": "6c1bec48-b004-4aa9-a356-30642acf912a",
+    "worker": "worker-1"
    },
-   "ts": "2026-11-15T23:14:57.528376Z"
+   "ts": "2026-11-25T19:51:39.258029Z"
   },
   {
    "id": 16,
-   "stream_id": "1794784497902-0",
+   "stream_id": "1795636299631-0",
    "type": "worker.killed",
    "payload": {
     "worker": "worker-2"
    },
-   "ts": "2026-11-15T23:14:57.871369Z"
+   "ts": "2026-11-25T19:51:39.611066Z"
   },
   {
    "id": 17,
-   "stream_id": "1794784497902-1",
+   "stream_id": "1795636299631-1",
    "type": "worker.started",
    "payload": {
     "worker": "worker-4"
    },
-   "ts": "2026-11-15T23:14:57.876650Z"
+   "ts": "2026-11-25T19:51:39.614206Z"
   },
   {
    "id": 18,
-   "stream_id": "1794784497902-2",
+   "stream_id": "1795636299631-2",
    "type": "job.started",
    "payload": {
-    "job_id": "27514172-31b4-4f1d-a4b1-a982a559dbb9",
+    "job_id": "b606d907-4e9d-4112-a9b4-2081f8aa343f",
     "worker": "worker-4"
    },
-   "ts": "2026-11-15T23:14:57.877823Z"
+   "ts": "2026-11-25T19:51:39.615233Z"
   },
   {
    "id": 19,
-   "stream_id": "1794784499021-0",
+   "stream_id": "1795636300720-0",
    "type": "job.succeeded",
    "payload": {
-    "job_id": "e97770b5-79f9-4d15-8af5-a38618aaab09",
-    "worker": "worker-3"
+    "job_id": "6c1bec48-b004-4aa9-a356-30642acf912a",
+    "worker": "worker-1"
    },
-   "ts": "2026-11-15T23:14:58.987794Z"
+   "ts": "2026-11-25T19:51:40.717554Z"
   },
   {
    "id": 20,
-   "stream_id": "1794784499022-0",
+   "stream_id": "1795636300721-0",
    "type": "job.started",
    "payload": {
-    "job_id": "b59641f2-6868-443d-804b-b318492ae7d1",
-    "worker": "worker-3"
+    "job_id": "3a2aaf25-fa79-4611-8f9b-2a4c481d5064",
+    "worker": "worker-1"
    },
-   "ts": "2026-11-15T23:14:58.991727Z"
+   "ts": "2026-11-25T19:51:40.720257Z"
   },
   {
    "id": 21,
-   "stream_id": "1794784499076-0",
+   "stream_id": "1795636300773-0",
    "type": "job.succeeded",
    "payload": {
-    "job_id": "2d7b12e8-b7e5-496e-98b9-cef3e7752738",
-    "worker": "worker-1"
+    "job_id": "a226c45a-3c1c-4a58-b749-bd53b6ef030e",
+    "worker": "worker-3"
    },
-   "ts": "2026-11-15T23:14:59.029714Z"
+   "ts": "2026-11-25T19:51:40.762629Z"
   },
   {
    "id": 22,
-   "stream_id": "1794784499077-0",
+   "stream_id": "1795636300774-0",
    "type": "job.succeeded",
    "payload": {
-    "job_id": "27514172-31b4-4f1d-a4b1-a982a559dbb9",
+    "job_id": "b606d907-4e9d-4112-a9b4-2081f8aa343f",
     "worker": "worker-4"
    },
-   "ts": "2026-11-15T23:14:59.034366Z"
+   "ts": "2026-11-25T19:51:40.772211Z"
   },
   {
    "id": 23,
-   "stream_id": "1794784499712-0",
+   "stream_id": "1795636301396-0",
    "type": "job.recovered",
    "payload": {
-    "job_id": "b715e706-0a1d-44e8-befc-5294de0b4bfa",
+    "job_id": "14c8d8b6-8c56-4ea6-a09e-4e5bff07b699",
     "new_worker": "worker-4",
     "previous_worker": "worker-2"
    },
-   "ts": "2026-11-15T23:14:59.659128Z"
+   "ts": "2026-11-25T19:51:41.391165Z"
   },
   {
    "id": 24,
-   "stream_id": "1794784499713-0",
+   "stream_id": "1795636301397-0",
    "type": "job.started",
    "payload": {
-    "job_id": "b715e706-0a1d-44e8-befc-5294de0b4bfa",
+    "job_id": "14c8d8b6-8c56-4ea6-a09e-4e5bff07b699",
     "worker": "worker-4"
    },
-   "ts": "2026-11-15T23:14:59.659128Z"
+   "ts": "2026-11-25T19:51:41.391165Z"
   },
   {
    "id": 25,
-   "stream_id": "1794784500293-0",
-   "type": "job.succeeded",
+   "stream_id": "1795636301762-0",
+   "type": "job.progress",
    "payload": {
-    "job_id": "b59641f2-6868-443d-804b-b318492ae7d1",
-    "worker": "worker-3"
+    "job_id": "3a2aaf25-fa79-4611-8f9b-2a4c481d5064",
+    "worker": "worker-1",
+    "percent": 25
    },
-   "ts": "2026-11-15T23:15:00.264131Z"
+   "ts": "2026-11-25T19:51:41.723050Z"
   },
   {
    "id": 26,
-   "stream_id": "1794784500294-0",
-   "type": "task.succeeded",
+   "stream_id": "1795636302496-0",
+   "type": "job.succeeded",
    "payload": {
-    "goal_id": "667b5fea-b22c-4d1d-bcf6-40f1a7af351c",
-    "task_id": "fe9fbca2-6364-4fc9-aeb5-56dcbd708a89"
+    "job_id": "14c8d8b6-8c56-4ea6-a09e-4e5bff07b699",
+    "worker": "worker-4"
    },
-   "ts": "2026-11-15T23:15:00.264131Z"
+   "ts": "2026-11-25T19:51:42.450620Z"
   },
   {
    "id": 27,
-   "stream_id": "1794784500294-1",
-   "type": "task.queued",
+   "stream_id": "1795636302757-0",
+   "type": "job.progress",
    "payload": {
-    "job_id": "b1ea7ad9-c535-442c-bfea-6b0fd4beeea8",
-    "goal_id": "667b5fea-b22c-4d1d-bcf6-40f1a7af351c",
-    "task_id": "33241d47-ee43-4aa1-8e03-bce6726dfe7e"
+    "job_id": "3a2aaf25-fa79-4611-8f9b-2a4c481d5064",
+    "worker": "worker-1",
+    "percent": 50
    },
-   "ts": "2026-11-15T23:15:00.264131Z"
+   "ts": "2026-11-25T19:51:42.724610Z"
   },
   {
    "id": 28,
-   "stream_id": "1794784500295-0",
-   "type": "task.queued",
+   "stream_id": "1795636303748-0",
+   "type": "job.progress",
    "payload": {
-    "job_id": "0beda3d2-ad62-41dc-a019-5cbf4f566bc4",
-    "goal_id": "667b5fea-b22c-4d1d-bcf6-40f1a7af351c",
-    "task_id": "b5eb8286-f263-4849-a955-78fbc7466f26"
+    "job_id": "3a2aaf25-fa79-4611-8f9b-2a4c481d5064",
+    "worker": "worker-1",
+    "percent": 75
    },
-   "ts": "2026-11-15T23:15:00.264131Z"
+   "ts": "2026-11-25T19:51:43.726178Z"
   },
   {
    "id": 29,
-   "stream_id": "1794784500299-0",
-   "type": "job.started",
+   "stream_id": "1795636304790-0",
+   "type": "job.succeeded",
    "payload": {
-    "job_id": "b1ea7ad9-c535-442c-bfea-6b0fd4beeea8",
+    "job_id": "3a2aaf25-fa79-4611-8f9b-2a4c481d5064",
     "worker": "worker-1"
    },
-   "ts": "2026-11-15T23:15:00.293722Z"
+   "ts": "2026-11-25T19:51:44.728510Z"
   },
   {
    "id": 30,
-   "stream_id": "1794784500300-0",
-   "type": "job.started",
+   "stream_id": "1795636304791-0",
+   "type": "task.succeeded",
    "payload": {
-    "job_id": "0beda3d2-ad62-41dc-a019-5cbf4f566bc4",
-    "worker": "worker-3"
+    "goal_id": "064db388-419c-4163-8251-aa6e1d838e11",
+    "task_id": "ca3e06c2-17f4-4720-94b4-5359898223a5"
    },
-   "ts": "2026-11-15T23:15:00.294723Z"
+   "ts": "2026-11-25T19:51:44.728510Z"
   },
   {
    "id": 31,
-   "stream_id": "1794784500774-0",
-   "type": "job.succeeded",
+   "stream_id": "1795636304793-0",
+   "type": "task.queued",
    "payload": {
-    "job_id": "b715e706-0a1d-44e8-befc-5294de0b4bfa",
-    "worker": "worker-4"
+    "job_id": "068b06ea-95be-4573-8101-6fa9fd892667",
+    "goal_id": "064db388-419c-4163-8251-aa6e1d838e11",
+    "task_id": "f7b15d4b-9115-4c3f-add7-086fddd680ac"
    },
-   "ts": "2026-11-15T23:15:00.719865Z"
+   "ts": "2026-11-25T19:51:44.728510Z"
   },
   {
    "id": 32,
-   "stream_id": "1794784501614-0",
-   "type": "job.succeeded",
+   "stream_id": "1795636304793-1",
+   "type": "task.queued",
    "payload": {
-    "job_id": "0beda3d2-ad62-41dc-a019-5cbf4f566bc4",
-    "worker": "worker-3"
+    "job_id": "15f54acb-7b4f-44f0-9c4c-36cbec39d24d",
+    "goal_id": "064db388-419c-4163-8251-aa6e1d838e11",
+    "task_id": "fb7a1ee7-1e1b-42f5-bdba-6f43acc2a586"
    },
-   "ts": "2026-11-15T23:15:01.560125Z"
+   "ts": "2026-11-25T19:51:44.728510Z"
   },
   {
    "id": 33,
-   "stream_id": "1794784501614-1",
-   "type": "task.succeeded",
+   "stream_id": "1795636304795-0",
+   "type": "job.started",
    "payload": {
-    "goal_id": "667b5fea-b22c-4d1d-bcf6-40f1a7af351c",
-    "task_id": "b5eb8286-f263-4849-a955-78fbc7466f26"
+    "job_id": "068b06ea-95be-4573-8101-6fa9fd892667",
+    "worker": "worker-4"
    },
-   "ts": "2026-11-15T23:15:01.560125Z"
+   "ts": "2026-11-25T19:51:44.791399Z"
   },
   {
    "id": 34,
-   "stream_id": "1794784501823-0",
-   "type": "job.succeeded",
+   "stream_id": "1795636304848-0",
+   "type": "job.started",
    "payload": {
-    "job_id": "b1ea7ad9-c535-442c-bfea-6b0fd4beeea8",
+    "job_id": "15f54acb-7b4f-44f0-9c4c-36cbec39d24d",
     "worker": "worker-1"
    },
-   "ts": "2026-11-15T23:15:01.800732Z"
+   "ts": "2026-11-25T19:51:44.799913Z"
   },
   {
    "id": 35,
-   "stream_id": "1794784501824-0",
-   "type": "task.succeeded",
+   "stream_id": "1795636305835-0",
+   "type": "job.progress",
    "payload": {
-    "goal_id": "667b5fea-b22c-4d1d-bcf6-40f1a7af351c",
-    "task_id": "33241d47-ee43-4aa1-8e03-bce6726dfe7e"
+    "job_id": "068b06ea-95be-4573-8101-6fa9fd892667",
+    "worker": "worker-4",
+    "percent": 25
    },
-   "ts": "2026-11-15T23:15:01.800732Z"
+   "ts": "2026-11-25T19:51:45.796279Z"
   },
   {
    "id": 36,
-   "stream_id": "1794784501824-1",
-   "type": "task.awaiting_approval",
+   "stream_id": "1795636305835-1",
+   "type": "job.progress",
    "payload": {
-    "name": "Review and publish",
-    "goal_id": "667b5fea-b22c-4d1d-bcf6-40f1a7af351c",
-    "task_id": "c571e872-bbb3-40f5-bb2f-078271addd93"
+    "job_id": "15f54acb-7b4f-44f0-9c4c-36cbec39d24d",
+    "worker": "worker-1",
+    "percent": 25
    },
-   "ts": "2026-11-15T23:15:01.800732Z"
+   "ts": "2026-11-25T19:51:45.805119Z"
   },
   {
    "id": 37,
-   "stream_id": "1794784503406-0",
-   "type": "task.approved",
+   "stream_id": "1795636306822-0",
+   "type": "job.progress",
    "payload": {
-    "goal_id": "667b5fea-b22c-4d1d-bcf6-40f1a7af351c",
-    "task_id": "c571e872-bbb3-40f5-bb2f-078271addd93"
+    "job_id": "068b06ea-95be-4573-8101-6fa9fd892667",
+    "worker": "worker-4",
+    "percent": 50
    },
-   "ts": "2026-11-15T23:15:03.356418Z"
+   "ts": "2026-11-25T19:51:46.798957Z"
   },
   {
    "id": 38,
-   "stream_id": "1794784503407-0",
-   "type": "task.queued",
+   "stream_id": "1795636306823-0",
+   "type": "job.progress",
    "payload": {
-    "job_id": "a33c2edf-9dbc-4bdf-8364-a55d68266165",
-    "goal_id": "667b5fea-b22c-4d1d-bcf6-40f1a7af351c",
-    "task_id": "c571e872-bbb3-40f5-bb2f-078271addd93"
+    "job_id": "15f54acb-7b4f-44f0-9c4c-36cbec39d24d",
+    "worker": "worker-1",
+    "percent": 50
    },
-   "ts": "2026-11-15T23:15:03.356418Z"
+   "ts": "2026-11-25T19:51:46.806516Z"
   },
   {
    "id": 39,
-   "stream_id": "1794784503410-0",
-   "type": "job.started",
+   "stream_id": "1795636307807-0",
+   "type": "job.progress",
    "payload": {
-    "job_id": "a33c2edf-9dbc-4bdf-8364-a55d68266165",
-    "worker": "worker-1"
+    "job_id": "068b06ea-95be-4573-8101-6fa9fd892667",
+    "worker": "worker-4",
+    "percent": 75
    },
-   "ts": "2026-11-15T23:15:03.406373Z"
+   "ts": "2026-11-25T19:51:47.801023Z"
   },
   {
    "id": 40,
-   "stream_id": "1794784504885-0",
-   "type": "job.succeeded",
+   "stream_id": "1795636307810-0",
+   "type": "job.progress",
    "payload": {
-    "job_id": "a33c2edf-9dbc-4bdf-8364-a55d68266165",
-    "worker": "worker-1"
+    "job_id": "15f54acb-7b4f-44f0-9c4c-36cbec39d24d",
+    "worker": "worker-1",
+    "percent": 75
    },
-   "ts": "2026-11-15T23:15:04.843661Z"
+   "ts": "2026-11-25T19:51:47.807871Z"
   },
   {
    "id": 41,
-   "stream_id": "1794784504886-0",
-   "type": "task.succeeded",
+   "stream_id": "1795636308847-0",
+   "type": "job.succeeded",
    "payload": {
-    "goal_id": "667b5fea-b22c-4d1d-bcf6-40f1a7af351c",
-    "task_id": "c571e872-bbb3-40f5-bb2f-078271addd93"
+    "job_id": "068b06ea-95be-4573-8101-6fa9fd892667",
+    "worker": "worker-4"
    },
-   "ts": "2026-11-15T23:15:04.843661Z"
+   "ts": "2026-11-25T19:51:48.803717Z"
   },
   {
    "id": 42,
-   "stream_id": "1794784504886-1",
+   "stream_id": "1795636308848-0",
+   "type": "task.succeeded",
+   "payload": {
+    "goal_id": "064db388-419c-4163-8251-aa6e1d838e11",
+    "task_id": "f7b15d4b-9115-4c3f-add7-086fddd680ac"
+   },
+   "ts": "2026-11-25T19:51:48.803717Z"
+  },
+  {
+   "id": 43,
+   "stream_id": "1795636308848-1",
+   "type": "job.succeeded",
+   "payload": {
+    "job_id": "15f54acb-7b4f-44f0-9c4c-36cbec39d24d",
+    "worker": "worker-1"
+   },
+   "ts": "2026-11-25T19:51:48.810168Z"
+  },
+  {
+   "id": 44,
+   "stream_id": "1795636308848-2",
+   "type": "task.succeeded",
+   "payload": {
+    "goal_id": "064db388-419c-4163-8251-aa6e1d838e11",
+    "task_id": "fb7a1ee7-1e1b-42f5-bdba-6f43acc2a586"
+   },
+   "ts": "2026-11-25T19:51:48.810168Z"
+  },
+  {
+   "id": 45,
+   "stream_id": "1795636308849-0",
+   "type": "task.awaiting_approval",
+   "payload": {
+    "name": "Review and publish",
+    "goal_id": "064db388-419c-4163-8251-aa6e1d838e11",
+    "task_id": "9884c0a7-5978-4501-a476-52779966b8b7"
+   },
+   "ts": "2026-11-25T19:51:48.810168Z"
+  },
+  {
+   "id": 46,
+   "stream_id": "1795636310408-0",
+   "type": "task.approved",
+   "payload": {
+    "goal_id": "064db388-419c-4163-8251-aa6e1d838e11",
+    "task_id": "9884c0a7-5978-4501-a476-52779966b8b7"
+   },
+   "ts": "2026-11-25T19:51:50.360971Z"
+  },
+  {
+   "id": 47,
+   "stream_id": "1795636310409-0",
+   "type": "task.queued",
+   "payload": {
+    "job_id": "33c88665-1e99-4578-960b-1a3edb0f3766",
+    "goal_id": "064db388-419c-4163-8251-aa6e1d838e11",
+    "task_id": "9884c0a7-5978-4501-a476-52779966b8b7"
+   },
+   "ts": "2026-11-25T19:51:50.360971Z"
+  },
+  {
+   "id": 48,
+   "stream_id": "1795636310410-0",
+   "type": "job.started",
+   "payload": {
+    "job_id": "33c88665-1e99-4578-960b-1a3edb0f3766",
+    "worker": "worker-1"
+   },
+   "ts": "2026-11-25T19:51:50.408880Z"
+  },
+  {
+   "id": 49,
+   "stream_id": "1795636311444-0",
+   "type": "job.progress",
+   "payload": {
+    "job_id": "33c88665-1e99-4578-960b-1a3edb0f3766",
+    "worker": "worker-1",
+    "percent": 25
+   },
+   "ts": "2026-11-25T19:51:51.411554Z"
+  },
+  {
+   "id": 50,
+   "stream_id": "1795636312425-0",
+   "type": "job.progress",
+   "payload": {
+    "job_id": "33c88665-1e99-4578-960b-1a3edb0f3766",
+    "worker": "worker-1",
+    "percent": 50
+   },
+   "ts": "2026-11-25T19:51:52.413705Z"
+  },
+  {
+   "id": 51,
+   "stream_id": "1795636313418-0",
+   "type": "job.progress",
+   "payload": {
+    "job_id": "33c88665-1e99-4578-960b-1a3edb0f3766",
+    "worker": "worker-1",
+    "percent": 75
+   },
+   "ts": "2026-11-25T19:51:53.415253Z"
+  },
+  {
+   "id": 52,
+   "stream_id": "1795636314458-0",
+   "type": "job.succeeded",
+   "payload": {
+    "job_id": "33c88665-1e99-4578-960b-1a3edb0f3766",
+    "worker": "worker-1"
+   },
+   "ts": "2026-11-25T19:51:54.417053Z"
+  },
+  {
+   "id": 53,
+   "stream_id": "1795636314459-0",
+   "type": "task.succeeded",
+   "payload": {
+    "goal_id": "064db388-419c-4163-8251-aa6e1d838e11",
+    "task_id": "9884c0a7-5978-4501-a476-52779966b8b7"
+   },
+   "ts": "2026-11-25T19:51:54.417053Z"
+  },
+  {
+   "id": 54,
+   "stream_id": "1795636314459-1",
    "type": "goal.succeeded",
    "payload": {
-    "goal_id": "667b5fea-b22c-4d1d-bcf6-40f1a7af351c"
+    "goal_id": "064db388-419c-4163-8251-aa6e1d838e11"
    },
-   "ts": "2026-11-15T23:15:04.843661Z"
+   "ts": "2026-11-25T19:51:54.417053Z"
   }
  ]
 }
