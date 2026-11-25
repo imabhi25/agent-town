@@ -196,7 +196,7 @@ export class CityRenderer {
     if (state.events !== this.lastEvents || state.snapshot !== this.lastSnapshot) {
       this.lastEvents = state.events;
       this.lastSnapshot = state.snapshot;
-      this.scene.sync(state.snapshot, state.events); // the whole batch for this frame
+      this.scene.sync(state.snapshot, state.events, state.epoch); // the whole batch for this frame
       changed = true;
     }
     this.scene.step(dt);

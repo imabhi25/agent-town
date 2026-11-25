@@ -19,9 +19,10 @@ export interface StoreState {
   events: TownEvent[]; // sorted by (ts, id), newest last, at most MAX_EVENTS
   seen: Set<number>; // ids of the events in `events`
   gaps: number; // how many gaps we have detected (for the debug view)
+  epoch: number; // bumped by TownStore.reset(): consumers that remember applied events must start over
 }
 
-export const initialState: StoreState = { snapshot: null, events: [], seen: new Set(), gaps: 0 };
+export const initialState: StoreState = { snapshot: null, events: [], seen: new Set(), gaps: 0, epoch: 0 };
 
 export function compareEvents(a: TownEvent, b: TownEvent): number {
   const ta = Date.parse(a.ts);

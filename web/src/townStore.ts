@@ -36,7 +36,7 @@ export class TownStore {
 
   /** Forget everything: used when the source changes (or a replay restarts). */
   reset(status: Status = "idle") {
-    this.state = initialState;
+    this.state = { ...initialState, epoch: this.state.epoch + 1 };
     this.status = status;
     this.emit();
   }

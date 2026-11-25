@@ -151,6 +151,28 @@ describe("approvals", () => {
   });
 });
 
+describe("store reset (a recording restarts)", () => {
+  it("applies the same events again after the store epoch changes", () => {
+    const s = new Scene();
+    const sn = snap();
+    const e = ev("task.awaiting_approval", { goal_id: "g", task_id: "t1", name: "x" });
+    s.sync(sn, [e], 0);
+    expect(s.approvals).toHaveLength(1);
+    // TownStore.reset() bumps the epoch; the replay then feeds the SAME snapshot object and events.
+    s.sync(sn, [], 1);
+    expect(s.approvals).toEqual([]);
+    s.sync(sn, [e], 1);
+    expect(s.approvals).toHaveLength(1);
+  });
+  it("keeps counting when the epoch has not changed", () => {
+    const s = new Scene();
+    const e = ev("job.succeeded", { worker: "w1", job_id: "k" });
+    s.sync(null, [e], 0);
+    s.sync(null, [e], 0);
+    expect(s.done).toBe(1);
+  });
+});
+
 describe("snapshots", () => {
   it("rebase sets counters, workers, dead jobs and pending approvals", () => {
     const s = new Scene();
