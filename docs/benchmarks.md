@@ -1,5 +1,9 @@
 # Benchmarks
 
+> This page is the original single-process k6 benchmark of the HTTP API and embedded workers.
+> The multi-process engine benchmark (throughput, p50/p99 and recovery time after kill -9) is
+> generated into the README from `results/bench/engine.jsonl` by `scripts/bench_report.py`.
+
 Everything here is a single run (one run per row) on one Apple M3 laptop against the LOCAL stack, with
 k6 on the same machine and a mock LLM at about 125 ms per call. These are not free-tier numbers.
 The free tiers (a shared Render CPU, Neon, Upstash over the internet) are slower and capped, so do
@@ -81,6 +85,7 @@ idempotent completion gives one stored result per job (delivery is not exactly-o
   throughput is bounded by the provider, not by the engine.
 - Network latency to a hosted Postgres or Redis. Each job costs several round trips to each, so a
   hosted database will lower jobs/s.
-- Multi-process scaling: only a single process was tested.
+- Multi-process scaling: only a single process was tested here. Worker processes are measured
+  by `scripts/bench_engine.py` (results in `results/bench/engine.jsonl`, table in the README).
 - The log line `consumer group missing; recreating` appeared once during the matrix: it is the
   engine repairing itself when Redis was wiped between runs, not an error.

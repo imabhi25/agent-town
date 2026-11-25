@@ -287,3 +287,12 @@ rerun the script and ffmpeg.
 **Why the fault phase ends on a stall.** A broken run that lost jobs never finishes, so waiting for "all jobs done" would wait for the timeout. Faults stop when every job is done or nothing has finished for 4 s, then the survivors get a quiet drain period before the check, so a slow-but-correct run is not mistaken for a lost job.
 
 **CI.** A separate job runs 3 correct and 2 broken runs of 150 jobs on every pull request (about a minute) and uploads the JSON lines. It installs `redis-server` because the campaign must own a Redis it can kill; a GitHub service container cannot be killed and restarted from a step.
+
+## Engine benchmark and README rewrite
+**Why a second benchmark.** The k6 benchmark (`bench/`) measures the HTTP API with workers inside the API process, and it found the ceiling of one Python process (about 100 jobs/s). `scripts/bench_engine.py` measures the engine the way it is meant to scale: one worker per process (the same `app/chaos_proc.py` processes the chaos campaign kills), with no HTTP in the path. Jobs go in through the outbox exactly as `POST /jobs` writes them.
+
+**Throughput and latency are measured separately.** Throughput is a burst (100 jobs per worker) timed from the first job started to the last one done. Latency in a burst is only queue wait, so it is measured in a second phase at a steady 60% of the measured throughput, from `created_at` to `completed_at` per job. Percentiles are nearest-rank, so each reported value is one a job actually saw.
+
+**Recovery uses the production clocks.** Recovery time is what a user of the deployed system would see, so the benchmark runs the default lease (15 s), heartbeat TTL (6 s) and recovery interval (5 s), kills the worker that is running a 2 s job, and reads the takeover time from the `job.recovered` event. The expected answer is "about the lease" and that is the point to make in an interview: a shorter lease recovers faster but risks taking jobs from workers that are only slow, which the heartbeat check guards against.
+
+**README order.** The README now opens with the guarantee and the generated headline numbers, then the live demo, then how it works, then the evidence (chaos campaign, benchmarks), then one Limitations section that collects every caveat. All numbers in the README come from `results/` through the two report scripts, and tests fail if they drift.
