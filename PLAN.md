@@ -167,5 +167,7 @@ Slice 4 (done): agents visibly build the town. Engine: a goal's task job takes `
 the running job; a failing attempt reports one step and stops. Town: walls rise inside a wooden
 scaffold to the reported progress, the roof drops on and the windows light up on `task.succeeded`,
 a retry knocks the walls back down, robots walk at 7 m/s, stand beside their building and hammer,
-the Foreman turns toward the latest event, and the lamps brighten when the goal succeeds. Night
-palette after the owner's mockup. Recorded traces re-recorded with progress events.
+the Foreman turns toward the latest event, and the lamps brighten when the goal succeeds. The town
+is laid out and lit like the owner's mockup (square, fountain, town hall, cobbled street loop,
+blocks of cottages, pines, lamps, diamond view, no path arrows). Recorded traces re-recorded with
+progress events.

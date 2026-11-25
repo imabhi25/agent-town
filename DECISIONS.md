@@ -238,9 +238,9 @@ The row lock makes two workers claiming at once take turns, so the second always
 
 **Why the scene reads only the event store.** Recorded traces and the live WebSocket already go through one store (deduped by id, ordered), so feeding the 3D view from it means a recording and a live run can never look different, and nothing animates unless an event said so.
 
-**Zones are DAG stages.** Tasks carry no kind or group, and adding one would mean changing the engine and re-recording the traces. A task's stage (1 + the deepest stage among its dependencies) is already in `task.created.depends_on`, works for every recorded trace, and gives the plan a natural left-to-right-around-the-ring reading. More than 6 stages merge into the last zone.
+**Zones are DAG stages.** Tasks carry no kind or group, and adding one would mean changing the engine and re-recording the traces. A task's stage (1 + the deepest stage among its dependencies) is already in `task.created.depends_on`, works for every recorded trace, and gives the plan a natural reading round the square. More than 6 stages merge into the last zone.
 
-**The layout is data.** `docs/reference/town-layout.json` is written by a seeded script and read by the app and its tests: zones, 8 slots each, roads as spline centrelines, the path graph, barriers and props. Tests check no overlaps, every slot reachable from the plaza, one non-crossing main ring, props off the roads, the decoration triangle budget, and that every preset and recorded trace fits.
+**The layout is data.** `docs/reference/town-layout.json` is written by a seeded script and read by the app and its tests: zones, 8 slots each, roads as spline centrelines, the path graph, barriers and props. Tests check no overlaps, every slot reachable from the plaza, props off the streets, blocks and square, lamps beside the streets, and that every preset and recorded trace fits. (Since the mockup layout, the original ring of zones and its arrows are gone; see below.)
 
 **Static geometry is merged, repeated things are instanced.** Roads, plaza, foundations, robots and lamps are one mesh with vertex colours; trees, bushes, rocks, flowers, fences and road arrows are InstancedMeshes. Phase A draws in 40 calls and 14k triangles against budgets of 150 and 56k.
 
@@ -305,9 +305,17 @@ building to 75% first. That keeps the retries recording at 25 s instead of 52 s.
 **Cost on the live demo.** Three extra events per task attempt, about 15 per goal. With the 30
 goals per day cap that is under 500 extra Redis stream writes a day, well inside the budget guard.
 
-**Look: night palette, cottages, still cheap.** The owner's mockup set the mood (night, lavender
-accent, warm windows, low-poly cottages, scaffolds). The scene keeps the same layout and budgets:
-a cottage is a wall box, a door, five windows sharing one material, a gable roof (a 3-sided prism)
-and a chimney; lamps are one instanced mesh that brightens when the goal succeeds. No point
-lights, no post-processing. The Foreman is now its own mesh and turns toward the building the
-latest event was about.
+**Look: the owner's mockup, not just its mood.** A first pass kept the old ring of round zones
+with path arrows and only borrowed the mockup's colours; the owner rejected it ("use the image").
+The town is now laid out like the mockup: a paved square with a fountain in front of the town hall
+(where the Foreman stands), a loop of lavender-grey cobbled streets round it, six rectangular
+blocks of cottage lots facing those streets (stages 1-3 along the near street, 4-6 along the far
+one), pines round the edge of the board and between the blocks, and lamps along the streets. The
+camera is turned 45 degrees so the board reads as a diamond, as in the mockup, and is fitted to
+the town rather than the whole board so the cottages read bigger. Path arrows and zone discs are
+gone: a worker's walk already shows the route. Lots no task uses hold a small garden (a pine and
+two bushes), so empty blocks look planted rather than bare. Cost stays small: streets are textured
+strips (one canvas cobble texture), static geometry is merged, trees and gardens are instanced,
+the lamp halos are one Points object, and five warm point lights over the square are used only at
+high quality. A cottage is a stone footing, a wall box with timber beams, a door, windows sharing
+one material that lights when the task succeeds, a steep gable roof, a chimney and a dormer.
