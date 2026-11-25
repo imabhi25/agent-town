@@ -45,6 +45,11 @@ class WorkerExtras:
     protection: Protection | None = None  # circuit breaker + provider token bucket
     gate: SleepGate | None = None  # free-tier live demo: sleep when idle
     idle_backoff_max: float = 0.0  # seconds; 0 = no extra back-off when the queue is empty
+    # DELIBERATELY BROKEN, for the chaos campaign only (scripts/chaos_campaign.py --mode unsafe):
+    # XACK as soon as the job is claimed, BEFORE the provider call and the completion commit.
+    # A crash in between then loses the job. It exists so the checker can be shown to catch the
+    # bug the real ordering prevents. Nothing in the app sets it.
+    unsafe_ack_before_commit: bool = False
 
 
 log = logging.getLogger("worker")
@@ -289,6 +294,9 @@ async def handle_message(
         # Another live worker is running this job. Do NOT ack: if that worker dies, the message
         # is still pending and gets reclaimed. If it finishes, the next claim sees 'succeeded'.
         return
+
+    if extras.unsafe_ack_before_commit:
+        await redis.xack(STREAM, GROUP, msg_id)  # the bug under test; see WorkerExtras
 
     payload = json.loads(fields.get("payload") or "{}")
     on_success = None
