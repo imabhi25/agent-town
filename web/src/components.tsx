@@ -141,11 +141,38 @@ export function ApprovalCards(props: {
 
 export function Legend(props: { summary: SceneSummary }) {
   const s = props.summary;
+  // Counters as chips. The " · " separators are visually hidden but stay in the text, so a screen
+  // reader (and textContent) still reads the scene as one sentence.
+  const sep = <span className="sr-only"> · </span>;
   return (
-    <p className="summary" role="status" aria-live="polite" data-testid="summary">
-      {s.workers} workers ({s.busy} busy) · {s.queue} queued · {s.done} done · {s.dead} dead ·
-      circuit {s.circuit}
-      {s.approvals > 0 ? ` · ${s.approvals} awaiting approval` : ""}
+    <p className="summary stats" role="status" aria-live="polite" data-testid="summary">
+      <span className="stat">
+        <b>{s.workers}</b> workers <small>({s.busy} busy)</small>
+      </span>
+      {sep}
+      <span className={`stat ${s.queue > 0 ? "warn" : ""}`}>
+        <b>{s.queue}</b> queued
+      </span>
+      {sep}
+      <span className={`stat ${s.done > 0 ? "good" : ""}`}>
+        <b>{s.done}</b> done
+      </span>
+      {sep}
+      <span className={`stat ${s.dead > 0 ? "bad" : ""}`}>
+        <b>{s.dead}</b> dead
+      </span>
+      {sep}
+      <span className={`stat ${s.circuit === "tripped" ? "bad" : "good"}`}>
+        circuit <b>{s.circuit}</b>
+      </span>
+      {s.approvals > 0 && (
+        <>
+          {sep}
+          <span className="stat ask">
+            <b>{s.approvals}</b> awaiting approval
+          </span>
+        </>
+      )}
     </p>
   );
 }
