@@ -5,7 +5,7 @@ import { Walker, WALK_SPEED, targetNode } from "./walker";
 
 const task = (over: Partial<TaskView>): TaskView => ({
   id: "t", key: "t1", name: "t", stage: 1, zone: 1, slot: 0, status: "running", jobId: null, worker: null,
-  attempt: 0, retryAtMs: null, needsApproval: false, ...over,
+  attempt: 0, retryAtMs: null, needsApproval: false, progress: 0, ...over,
 });
 const model = (tasks: TaskView[]): TownModel => ({ ...EMPTY_MODEL, tasks });
 

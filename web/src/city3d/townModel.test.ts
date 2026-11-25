@@ -85,6 +85,57 @@ describe("deriveTown", () => {
     expect(again).toMatchObject({ status: "running", worker: "w2", retryAtMs: null });
   });
 
+  it("raises a building with job.progress, never down within an attempt, and to 1 when built", () => {
+    const run = [...DIAMOND, ev("task.queued", { ...G, task_id: "id-t1", job_id: "j1" }), ev("job.started", { job_id: "j1", worker: "w1" })];
+    const at = (...more: TownEvent[]) => deriveTown(store([...run, ...more])).tasks[0].progress;
+    expect(at()).toBe(0);
+    const p25 = ev("job.progress", { job_id: "j1", worker: "w1", percent: 25 });
+    const p50 = ev("job.progress", { job_id: "j1", worker: "w1", percent: 50 });
+    expect(at(p25, p50)).toBe(0.5);
+    // a late duplicate of 25 after 50 does not lower it (the store sorts by ts then id; same ts here)
+    expect(at(p50, { ...p25, id: 9999, stream_id: "9999-0" })).toBe(0.5);
+    expect(at(p25, ev("job.succeeded", { job_id: "j1", worker: "w1" }), ev("task.succeeded", { ...G, task_id: "id-t1" }))).toBe(1);
+  });
+
+  it("a retry knocks the building back to the scaffold, and the next attempt starts at 0", () => {
+    const e = [
+      ...DIAMOND,
+      ev("task.queued", { ...G, task_id: "id-t1", job_id: "j1" }),
+      ev("job.started", { job_id: "j1", worker: "w1" }),
+      ev("job.progress", { job_id: "j1", worker: "w1", percent: 75 }),
+      ev("job.retry_scheduled", { job_id: "j1", worker: "w1", attempt: 1, delay: 1 }),
+    ];
+    expect(deriveTown(store(e)).tasks[0]).toMatchObject({ status: "retrying", progress: 0 });
+    const again = deriveTown(store([...e, ev("job.started", { job_id: "j1", worker: "w2" }), ev("job.progress", { job_id: "j1", worker: "w2", percent: 25 })]));
+    expect(again.tasks[0]).toMatchObject({ status: "running", worker: "w2", progress: 0.25 });
+  });
+
+  it("places a job that was already running when the page connected (first event is job.progress)", () => {
+    const e = [...DIAMOND, ev("task.queued", { ...G, task_id: "id-t1", job_id: "j1" }), ev("job.progress", { job_id: "j1", worker: "w3", percent: 50 })];
+    const m = deriveTown(store(e));
+    expect(m.tasks[0]).toMatchObject({ status: "running", worker: "w3", progress: 0.5 });
+    expect(m.workers.find((w) => w.id === "w3")?.taskId).toBe("id-t1");
+  });
+
+  it("ignores progress for a job that is not one of this goal's tasks, or already built", () => {
+    const done = [
+      ...DIAMOND,
+      ev("task.queued", { ...G, task_id: "id-t1", job_id: "j1" }),
+      ev("task.succeeded", { ...G, task_id: "id-t1" }),
+      ev("job.progress", { job_id: "j1", worker: "w1", percent: 25 }),
+      ev("job.progress", { job_id: "flood", worker: "w2", percent: 25 }),
+    ];
+    const m = deriveTown(store(done));
+    expect(m.tasks[0]).toMatchObject({ status: "succeeded", progress: 1 });
+    expect(m.tasks.slice(1).every((t) => t.progress === 0)).toBe(true);
+  });
+
+  it("the Foreman watches the task of the latest event", () => {
+    const e = [...DIAMOND, ev("task.queued", { ...G, task_id: "id-t1", job_id: "j1" }), ev("task.queued", { ...G, task_id: "id-t3", job_id: "j3" })];
+    expect(deriveTown(store(e)).focusTaskId).toBe("id-t3");
+    expect(deriveTown(store([...e, ev("job.started", { job_id: "j1", worker: "w1" })])).focusTaskId).toBe("id-t1");
+  });
+
   it("counts retries of this goal's tasks and the goal's elapsed time", () => {
     const e = [
       ev("goal.started", G, "2026-01-01T00:00:00Z"),

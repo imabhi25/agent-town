@@ -15,7 +15,7 @@ const LOW_TREES = 6;
 const blend = (a: string, b: string, t: number) => `#${new THREE.Color(a).lerp(new THREE.Color(b), t).getHexString()}`;
 
 /** A small low-poly robot built into a batch: boxy body, visor, antenna; the Foreman wears a hard hat. */
-function robot(b: Batch, x: number, z: number, rotY: number, s: number, accent: string, hat = false): void {
+export function robot(b: Batch, x: number, z: number, rotY: number, s: number, accent: string, hat = false): void {
   const c = Math.cos(rotY), sn = Math.sin(rotY);
   const at = (lx: number, ly: number, lz: number): [number, number, number] => [x + (lx * c + lz * sn) * s, ly * s, z + (-lx * sn + lz * c) * s];
   const box = (sx: number, sy: number, sz: number, lx: number, ly: number, lz: number, color: string) =>
@@ -50,7 +50,7 @@ function useStaticGeometry(plan: Plan, preview: boolean): { geo: THREE.BufferGeo
     zones.forEach((z, i) => {
       const used = active.has(z.stage);
       b.cyl(z.r + 0.3, z.r + 0.3, 0.035, 40, C.foot, [z.x, 0.0175, z.z]);
-      b.cyl(z.r, z.r, 0.04, 40, used ? blend(C.zoneGrass, ZONE_COLORS[i], 0.72) : C.zoneGrass, [z.x, 0.02, z.z]);
+      b.cyl(z.r, z.r, 0.04, 40, used ? blend(C.zoneGrass, ZONE_COLORS[i], 0.45) : C.zoneGrass, [z.x, 0.02, z.z]);
     });
 
     // roads: a curb under the surface, footpaths on top
@@ -72,9 +72,9 @@ function useStaticGeometry(plan: Plan, preview: boolean): { geo: THREE.BufferGeo
 
     // plaza: disc, the Foreman's podium, idle pads, a flagpole
     b.cyl(plaza.r, plaza.r, 0.05, 40, C.plaza, [plaza.x, 0.025, plaza.z]);
-    b.cyl(plaza.podium_r, plaza.podium_r + 0.1, 0.3, 16, "#d8cfbd", [plaza.foreman[0], 0.15, plaza.foreman[1]]);
-    plaza.pads.forEach(([px, pz]) => b.cyl(0.45, 0.45, 0.03, 14, "#ddd5c3", [px, 0.065, pz]));
-    robot(b, plaza.foreman[0], plaza.foreman[1], 0.3, 1.7, "#7fb5ef", true);
+    b.cyl(plaza.podium_r, plaza.podium_r + 0.1, 0.3, 16, "#a69cb5", [plaza.foreman[0], 0.15, plaza.foreman[1]]);
+    plaza.pads.forEach(([px, pz]) => b.cyl(0.45, 0.45, 0.03, 14, "#9d93ab", [px, 0.065, pz]));
+    // (the Foreman is its own mesh, <Foreman>, because it turns to watch the latest event)
     b.box([0.07, 3.1, 0.07], "#b8b1c2", [plaza.foreman[0] + 1.3, 1.55, plaza.foreman[1] - 0.6]);
     b.box([0.9, 0.5, 0.04], "#f2c14e", [plaza.foreman[0] + 1.75, 2.8, plaza.foreman[1] - 0.6]);
     // Phase A preview only: idle workers on the pads. Live, TownLive draws every worker (it moves them).
@@ -102,11 +102,10 @@ function useStaticGeometry(plan: Plan, preview: boolean): { geo: THREE.BufferGeo
       });
     });
 
-    // lamps and barrier posts
+    // lamp posts (the bulbs are <Lamps>: they glow, and brighten when the town is built)
     for (const p of LAYOUT.props) {
       if (p.kind !== "lamp") continue;
-      b.cyl(0.05, 0.06, 1.4, 6, "#8f8aa0", [p.x, 0.7, p.z]);
-      b.sphere(0.16, "#ffe8a8", [p.x, 1.5, p.z]);
+      b.cyl(0.05, 0.06, 1.4, 6, "#4b4458", [p.x, 0.7, p.z]);
     }
     return { geo: b.build(), triangles: b.triangles };
   }, [plan, preview]);
@@ -156,17 +155,69 @@ function Decoration({ quality }: { quality: Quality }) {
   const trees = by("tree");
   return (
     <>
-      <Instances props={trees} geometry={g.crown} colors={["#8fd3c4", "#a8dca0", "#7cc7b8"]} y={(p) => 1.05 * p.s} quality={quality} limit={LOW_TREES} />
-      <Instances props={trees} geometry={g.trunk} color="#b89f86" y={(p) => 0.3 * p.s} quality={quality} limit={LOW_TREES} />
+      <Instances props={trees} geometry={g.crown} colors={["#3f6e5e", "#4d7a55", "#36695c"]} y={(p) => 1.05 * p.s} quality={quality} limit={LOW_TREES} />
+      <Instances props={trees} geometry={g.trunk} color="#6b5444" y={(p) => 0.3 * p.s} quality={quality} limit={LOW_TREES} />
       {quality === "high" && (
         <>
-          <Instances props={by("bush")} geometry={g.bush} colors={["#8bcf7f", "#9bd98b"]} y={(p) => 0.3 * p.s} quality={quality} />
-          <Instances props={by("rock")} geometry={g.rock} color="#b9b4c2" y={(p) => 0.2 * p.s} quality={quality} />
+          <Instances props={by("bush")} geometry={g.bush} colors={["#4f7a4c", "#5a8556"]} y={(p) => 0.3 * p.s} quality={quality} />
+          <Instances props={by("rock")} geometry={g.rock} color="#6e6878" y={(p) => 0.2 * p.s} quality={quality} />
           <Instances props={by("flower")} geometry={g.flower} colors={["#f5b5b5", "#f9d9a8", "#cdb4f6", "#ffffff"]} y={() => 0.15} quality={quality} />
-          <Instances props={by("fence")} geometry={g.fence} color="#e3d6bd" y={() => 0.25} quality={quality} />
+          <Instances props={by("fence")} geometry={g.fence} color="#7a6450" y={() => 0.25} quality={quality} />
         </>
       )}
     </>
+  );
+}
+
+/** The Foreman on the plaza: one batched mesh that turns (eased) to face the building the latest
+ * event was about. `look` null = keep facing where it last looked. */
+export function Foreman({ look }: { look?: [number, number] | null }) {
+  const [fx, fz] = LAYOUT.plaza.foreman;
+  const geo = useMemo(() => {
+    const b = new Batch();
+    robot(b, 0, 0, 0, 1.7, "#b9a3ff", true);
+    return b.build();
+  }, []);
+  const ref = useRef<THREE.Group>(null);
+  const want = useRef(0.3);
+  if (look) want.current = Math.atan2(look[0] - fx, look[1] - fz);
+  useFrame((_, dt) => {
+    const g = ref.current;
+    if (!g) return;
+    // shortest way round, eased
+    const d = Math.atan2(Math.sin(want.current - g.rotation.y), Math.cos(want.current - g.rotation.y));
+    if (Math.abs(d) > 1e-3) g.rotation.y += d * Math.min(1, dt * 4);
+  });
+  return (
+    <group ref={ref} position={[fx, 0, fz]} rotation={[0, 0.3, 0]}>
+      <mesh geometry={geo} castShadow>
+        <meshStandardMaterial vertexColors roughness={0.8} flatShading />
+      </mesh>
+    </group>
+  );
+}
+
+/** Lamp bulbs, one instanced mesh. Dim while the town is being built; bright once it is done. */
+function Lamps({ lit }: { lit: boolean }) {
+  const lamps = useMemo(() => LAYOUT.props.filter((p) => p.kind === "lamp"), []);
+  const ref = useRef<THREE.InstancedMesh>(null);
+  const mat = useRef<THREE.MeshStandardMaterial>(null);
+  const geo = useMemo(() => new THREE.SphereGeometry(0.17, 10, 7), []);
+  useLayoutEffect(() => {
+    const m = ref.current!, mx = new THREE.Matrix4();
+    lamps.forEach((p, i) => m.setMatrixAt(i, mx.makeTranslation(p.x, 1.5, p.z)));
+    m.instanceMatrix.needsUpdate = true;
+  }, [lamps]);
+  useFrame((_, dt) => {
+    const m = mat.current;
+    if (!m) return;
+    const target = lit ? 2.4 : 0.9;
+    if (Math.abs(m.emissiveIntensity - target) > 1e-3) m.emissiveIntensity += (target - m.emissiveIntensity) * Math.min(1, dt * 2);
+  });
+  return (
+    <instancedMesh ref={ref} args={[geo, undefined, Math.max(1, lamps.length)]}>
+      <meshStandardMaterial ref={mat} color={C.lamp} emissive={C.lamp} emissiveIntensity={0.9} toneMapped={false} />
+    </instancedMesh>
   );
 }
 
@@ -236,7 +287,13 @@ export function Barrier({ x, z, rot, closed = 0 }: { x: number; z: number; rot: 
   );
 }
 
-export function TownStatic({ quality = "high", plan, circuitOpen = false }: { quality?: Quality; plan?: Plan; circuitOpen?: boolean }) {
+export function TownStatic({ quality = "high", plan, circuitOpen = false, foremanLook = null, built = false }: {
+  quality?: Quality;
+  plan?: Plan;
+  circuitOpen?: boolean;
+  foremanLook?: [number, number] | null; // where the Foreman looks (the latest event's building)
+  built?: boolean; // the goal succeeded: the lamps brighten
+}) {
   // No plan given = the Phase A preview (happy-path layout with ghosts, labels and three idle workers).
   const preview = plan === undefined;
   const used = plan ?? LAYOUT.preview.zones;
@@ -256,6 +313,8 @@ export function TownStatic({ quality = "high", plan, circuitOpen = false }: { qu
         <meshStandardMaterial vertexColors roughness={0.85} flatShading />
       </mesh>
       <Arrows />
+      <Foreman look={foremanLook} />
+      <Lamps lit={built} />
       <Decoration quality={quality} />
       {LAYOUT.gates.map((g) => (
         <Barrier key={g.id} x={g.x} z={g.z} rot={g.rot} closed={circuitOpen ? 1 : 0} />

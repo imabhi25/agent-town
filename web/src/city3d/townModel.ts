@@ -36,6 +36,7 @@ export interface TaskView {
   attempt: number; // last retry_scheduled attempt (0 = none yet)
   retryAtMs: number | null; // wall time (ms) the next attempt starts; the UI counts down to it
   needsApproval: boolean;
+  progress: number; // 0..1: the last job.progress of the current attempt; 1 once built
 }
 
 export interface WorkerView {
@@ -56,11 +57,12 @@ export interface TownModel {
   circuitOpen: boolean; // llm circuit: every barrier lowers
   deadJobs: number;
   retries: number; // job.retry_scheduled events for this goal's tasks
+  focusTaskId: string | null; // the task the latest event was about: the Foreman looks at it
 }
 
 export const EMPTY_MODEL: TownModel = {
   goalId: null, goalStatus: "none", startedMs: null, finishedMs: null,
-  tasks: [], zones: [], workers: [], circuitOpen: false, deadJobs: 0, retries: 0,
+  tasks: [], zones: [], workers: [], circuitOpen: false, deadJobs: 0, retries: 0, focusTaskId: null,
 };
 
 const str = (v: unknown): string => (typeof v === "string" ? v : "");
@@ -102,6 +104,7 @@ export function deriveTown(state: Pick<StoreState, "events">): TownModel {
   let circuitOpen = false;
   const dead = new Set<string>();
   let retries = 0;
+  let focus: string | null = null;
 
   const setWorker = (id: string, jobId: string | null) => {
     if (!id) return;
@@ -125,7 +128,7 @@ export function deriveTown(state: Pick<StoreState, "events">): TownModel {
         tasks.set(str(p.task_id), {
           id: str(p.task_id), key: str(p.key), name: str(p.name), stage: 1, zone: 1, slot: 0,
           status: "planned", jobId: null, worker: null, attempt: 0, retryAtMs: null,
-          needsApproval: p.needs_approval === true,
+          needsApproval: p.needs_approval === true, progress: 0,
         });
         deps.set(str(p.task_id), Array.isArray(p.depends_on) ? (p.depends_on as string[]) : []);
         break;
@@ -164,6 +167,7 @@ export function deriveTown(state: Pick<StoreState, "events">): TownModel {
         if (t) {
           t.status = "succeeded";
           t.retryAtMs = null;
+          t.progress = 1;
         }
         break;
       }
@@ -193,7 +197,23 @@ export function deriveTown(state: Pick<StoreState, "events">): TownModel {
           t.status = "running";
           t.worker = str(p.worker);
           t.retryAtMs = null;
+          t.progress = 0; // a new attempt starts from scratch (the provider call is re-run)
         }
+        break;
+      }
+      case "job.progress": {
+        // A worker reports 25/50/75% while the call runs (app/worker.py _progress_reporter). It is
+        // also proof the worker is on the job, so a page that connected mid-job can place it.
+        const t = taskOfJob(str(p.job_id));
+        if (!t || t.status === "succeeded" || t.status === "dead") break;
+        setWorker(str(p.worker), str(p.job_id));
+        if (t.status !== "running") {
+          t.status = "running";
+          t.retryAtMs = null;
+        }
+        t.worker = str(p.worker);
+        // Only ever up within an attempt: a duplicate or late event cannot shrink a building.
+        t.progress = Math.max(t.progress, Math.min(1, Math.max(0, Number(p.percent) / 100 || 0)));
         break;
       }
       case "job.recovered": {
@@ -203,6 +223,7 @@ export function deriveTown(state: Pick<StoreState, "events">): TownModel {
         if (t && t.status !== "succeeded") {
           t.status = "running";
           t.worker = str(p.new_worker);
+          t.progress = 0; // the new worker runs the call again
         }
         break;
       }
@@ -217,6 +238,7 @@ export function deriveTown(state: Pick<StoreState, "events">): TownModel {
           t.status = "retrying";
           t.worker = null;
           t.attempt = Number(p.attempt) || t.attempt + 1;
+          t.progress = 0; // knocked back to the scaffold until the next attempt
           t.retryAtMs = ms(e) + (Number(p.delay) || 0) * 1000;
         }
         break;
@@ -229,6 +251,7 @@ export function deriveTown(state: Pick<StoreState, "events">): TownModel {
           t.status = "dead";
           t.worker = null;
           t.retryAtMs = null;
+          t.progress = 0;
         }
         break;
       }
@@ -248,6 +271,9 @@ export function deriveTown(state: Pick<StoreState, "events">): TownModel {
         if (str(p.provider) === "llm") circuitOpen = false;
         break;
     }
+    // What the Foreman watches: the task this event was about (by task id, or by its job).
+    const about = tasks.get(str(p.task_id)) ?? taskOfJob(str(p.job_id));
+    if (about) focus = about.id;
   }
 
   // Zones and slots: stage from the dependency graph, slot = creation order inside the zone.
@@ -266,7 +292,7 @@ export function deriveTown(state: Pick<StoreState, "events">): TownModel {
 
   return {
     goalId, goalStatus, startedMs: started, finishedMs: finished, tasks: list, zones,
-    workers: [...workers.values()], circuitOpen, deadJobs: dead.size, retries,
+    workers: [...workers.values()], circuitOpen, deadJobs: dead.size, retries, focusTaskId: focus,
   };
 }
 

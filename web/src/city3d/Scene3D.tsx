@@ -69,6 +69,13 @@ function Rig() {
 
 const PAN = { x: 8, z: 6 };
 
+/** The building the latest event was about, as a point for the Foreman to face. */
+function foremanLook(model?: TownModel): [number, number] | null {
+  const t = model?.focusTaskId ? model.tasks.find((x) => x.id === model.focusTaskId) : undefined;
+  const slot = t ? LAYOUT.zones[t.zone - 1]?.slots[t.slot] : undefined;
+  return slot ? [slot.x, slot.z] : null;
+}
+
 export default function Scene3D({ quality = "high", model, onWorkerTap }: { quality?: Quality; model?: TownModel; onWorkerTap?: (id: string) => void }) {
   // No model = the Phase A static preview; with one, the town is built from events.
   const plan = useMemo<Plan | undefined>(() => (model ? model.zones.map((z) => ({ stage: z.zone, tasks: z.tasks })) : undefined), [model?.zones]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -82,11 +89,12 @@ export default function Scene3D({ quality = "high", model, onWorkerTap }: { qual
     >
       <color attach="background" args={[C.bg]} />
       <fog attach="fog" args={[C.bg, 90, 160]} />
-      <hemisphereLight args={["#fff8f0", "#d9d3e8", 1.5]} />
+      {/* night: a lavender sky light and a cool moon; the warm light comes from lamps and windows */}
+      <hemisphereLight args={["#b7a6ff", "#2b2338", 1.25]} />
       <directionalLight
         position={[14, 26, 12]}
-        intensity={2.1}
-        color="#fff3e0"
+        intensity={1.5}
+        color="#d9d0ff"
         castShadow={quality === "high"}
         shadow-mapSize={[2048, 2048]}
         shadow-bias={-0.0004}
@@ -98,7 +106,7 @@ export default function Scene3D({ quality = "high", model, onWorkerTap }: { qual
         shadow-camera-near={1}
         shadow-camera-far={80}
       />
-      <TownStatic quality={quality} plan={plan} circuitOpen={model?.circuitOpen} />
+      <TownStatic quality={quality} plan={plan} circuitOpen={model?.circuitOpen} foremanLook={foremanLook(model)} built={model?.goalStatus === "succeeded"} />
       {model && <TownLive model={model} onWorkerTap={onWorkerTap} />}
       <OrbitControls
         makeDefault
