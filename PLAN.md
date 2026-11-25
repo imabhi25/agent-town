@@ -29,7 +29,7 @@
 - [x] Deploy files and guide: Vercel + Render + Neon + Upstash, replay fallback (step 9; the manual account steps are in docs/DEPLOY.md)
 - [x] Daily caps in code (Gemini calls, live goals), per-IP limits, Redis command budget guard (step 4)
 - [ ] Link Google AI Pro Cloud credits; budget alert
-- [x] k6 benchmark, architecture diagram, design notes, resume bullets (step 10); demo GIF is a placeholder (needs a recording of the deployed site)
+- [x] k6 benchmark, architecture diagram, design notes, resume bullets (step 10); demo GIF recorded locally against the real engine with the mock planner (`web/scripts/record-demo.mjs`)
 - [x] Stretch: Redis Lua token-bucket rate limiter, circuit breaker
 
 ## MVP done when

@@ -223,3 +223,17 @@ The row lock makes two workers claiming at once take turns, so the second always
 **Honesty rules for the numbers.** Single runs, not averages; the first run's p99 includes warm-up and says so; load generator and server share the machine; no real LLM latency or network latency to the databases; `docs/INTERVIEW.md` quotes only numbers that are in `docs/benchmarks.md` and says "on my laptop". The one `consumer group missing; recreating` log line is the engine repairing itself after Redis was wiped between runs.
 
 **README.** Rewritten around: pitch, live link (placeholder until deploy), Mermaid architecture, delivery guarantee (at-least-once delivery, one stored result per job, not exactly-once), how to run, benchmark table, design decisions, free-tier limits. The demo GIF is a TODO: it needs a screen recording of the deployed site, which cannot be made from here.
+
+## Demo GIF
+**Recorded locally, not from the deployed site.** The live demo runs two workers with a 45 s lease
+to save free-tier Redis commands, so a crash and recovery would take most of a minute to show. The
+GIF instead runs the same engine locally with the mock planner and mock LLM (no API spend) and
+shorter timings: 2 to 2.5 s per mock call, 1.5 s heartbeat TTL, 2.5 s lease. The code path is the
+real one: the killed worker's message stays unacknowledged, `XAUTOCLAIM` hands it to another
+worker, and the database ends with one stored result per job (checked after recording).
+
+**Scripted, so it can be re-recorded.** `web/scripts/record-demo.mjs` drives the page with
+Playwright: type a goal, wait for a worker that holds a task job (the planner job is instant, so it
+needs the same job on two polls), kill that worker, wait for the job to show up on a different
+worker, start a fresh worker, approve the last task. The numbered captions are an overlay added by
+the script only. When the map changes (for example the 3D town), rerun the script and ffmpeg.
