@@ -24,12 +24,19 @@ def heartbeat_key(worker_id: str) -> str:
     return f"worker:hb:{worker_id}"
 
 
-async def beat(redis: Redis, worker_id: str, ttl: float) -> None:
-    await redis.set(heartbeat_key(worker_id), "1", px=int(ttl * 1000))
+async def beat(redis: Redis, worker_id: str, ttl: float, token: str = "1") -> None:
+    """Refresh the heartbeat. Its value is the worker's lock token (one per worker START), so a
+    reader can tell "this incarnation is alive" from "some process with this name is alive"."""
+    await redis.set(heartbeat_key(worker_id), token, px=int(ttl * 1000))
 
 
 async def is_alive(redis: Redis, worker_id: str) -> bool:
     return bool(await redis.exists(heartbeat_key(worker_id)))
+
+
+async def heartbeat_token(redis: Redis, worker_id: str) -> str | None:
+    """The lock token in the worker's heartbeat, or None if the heartbeat has expired."""
+    return await redis.get(heartbeat_key(worker_id))
 
 
 async def heartbeat_loop(
@@ -39,6 +46,7 @@ async def heartbeat_loop(
     interval: float,
     ttl: float,
     gate=None,
+    token: str = "1",
 ) -> None:
     while not stop.is_set():
         if gate is not None:
@@ -46,7 +54,7 @@ async def heartbeat_loop(
             if stop.is_set():
                 break
         try:
-            await beat(redis, worker_id, ttl)
+            await beat(redis, worker_id, ttl, token)
         except Exception:
             log.exception("%s: heartbeat failed; retrying", worker_id)
         with contextlib.suppress(TimeoutError):

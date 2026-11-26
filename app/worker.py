@@ -14,6 +14,7 @@ import contextlib
 import json
 import logging
 import time
+import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from uuid import UUID
@@ -30,7 +31,15 @@ from app.jobs import clamp_latency
 from app.planner import Planner, build_gemini_planner, make_plan
 from app.protection import Protection, deferral_delay
 from app.providers.mock_llm import MockLLM, ProviderError
-from app.recovery import RecoveryConfig, beat, claim_stale, heartbeat_key, heartbeat_loop, is_alive
+from app.recovery import (
+    RecoveryConfig,
+    beat,
+    claim_stale,
+    heartbeat_key,
+    heartbeat_loop,
+    heartbeat_token,
+    is_alive,
+)
 from app.retry import DELAYED_KEY, DLQ_STREAM, RetryPolicy, is_retryable
 from app.sleep import SleepGate
 
@@ -65,44 +74,73 @@ async def ensure_group(redis: Redis) -> None:
             raise
 
 
+async def _held_by_other(
+    redis: Redis,
+    previous: str,
+    previous_token: str | None,
+    worker_id: str,
+    lock_token: str | None,
+) -> bool:
+    """Is the job's lock held by a worker that is alive AND is the incarnation that took it?
+
+    A heartbeat proves a process with that NAME is running, not that it still runs this job: a
+    worker that crashed and came back under the same name beats again but has forgotten the job.
+    Comparing the heartbeat's token with the token stored on the lock tells the two apart. Without
+    it, a job locked by a restarted worker could be passed between live workers that each see it
+    as "busy" and leave it alone, forever (found by the TLA+ model, spec/README.md).
+    """
+    if previous == worker_id and previous_token == lock_token:
+        return False  # our own lock; we handle one message at a time, so it is stale
+    if previous_token is None:  # locked by a worker without a token: name-only check
+        return previous != worker_id and await is_alive(redis, previous)
+    return await heartbeat_token(redis, previous) == previous_token
+
+
 async def _claim(
-    pool: asyncpg.Pool, redis: Redis, job_id: UUID, worker_id: str
+    pool: asyncpg.Pool,
+    redis: Redis,
+    job_id: UUID,
+    worker_id: str,
+    lock_token: str | None = None,
 ) -> tuple[str, asyncpg.Record | None]:
     """Decide what to do with a delivered job, in ONE transaction holding the job's row lock.
 
     Returns (outcome, row):
     - "finished": job is gone, succeeded or dead. Caller XACKs.
-    - "busy": job is running under ANOTHER worker that is still heartbeating. Caller leaves the
-      message pending (no XACK) and does not run the provider.
+    - "busy": job is running under ANOTHER live worker incarnation. Caller leaves the message
+      pending (no XACK) and does not run the provider.
     - "claimed": this worker now owns the job; row has (attempts, max_attempts).
 
     FOR UPDATE makes two workers claiming the same job take turns: the second sees the first's
-    lock and finds its owner alive. If the previous owner is dead (no heartbeat), or the lock is
-    this worker's own (a worker handles one message at a time, so it cannot still be running it:
-    a restarted worker reusing its id), we take over and record job.recovered.
+    lock and finds its owner alive. If the previous owner is dead (no heartbeat), restarted (its
+    heartbeat carries a different token), or is this very worker, we take over and record
+    job.recovered.
     """
     async with pool.acquire() as conn, conn.transaction():
         job = await conn.fetchrow(
-            "SELECT status, locked_by FROM jobs WHERE id = $1 FOR UPDATE", job_id
+            "SELECT status, locked_by, lock_token FROM jobs WHERE id = $1 FOR UPDATE", job_id
         )
         if job is None or job["status"] in ("succeeded", "dead"):
             return "finished", None
 
         previous = job["locked_by"]
         took_over = job["status"] == "running" and previous is not None
-        if took_over and previous != worker_id and await is_alive(redis, previous):
+        if took_over and await _held_by_other(
+            redis, previous, job["lock_token"], worker_id, lock_token
+        ):
             return "busy", None
 
         row = await conn.fetchrow(
             """
             UPDATE jobs
-            SET status = 'running', locked_by = $2, started_at = now(), updated_at = now(),
-                attempts = attempts + 1
+            SET status = 'running', locked_by = $2, lock_token = $3, started_at = now(),
+                updated_at = now(), attempts = attempts + 1
             WHERE id = $1 AND status NOT IN ('succeeded', 'dead')
             RETURNING attempts, max_attempts
             """,
             job_id,
             worker_id,
+            lock_token,
         )
         if took_over:
             await add_event(
@@ -262,6 +300,7 @@ async def handle_message(
     after_complete: Callable[[UUID], Awaitable[None]] | None = None,
     provider_timeout: float | None = None,
     extras: WorkerExtras | None = None,
+    lock_token: str | None = None,
 ) -> None:
     """`extras.planner` is the real (Gemini) planner or None for mock-only (type 'planner' jobs).
     `after_complete` is a test hook awaited between the completion commit and the XACK."""
@@ -286,7 +325,7 @@ async def handle_message(
             await redis.xack(STREAM, GROUP, msg_id)
             return
 
-    outcome, claim = await _claim(pool, redis, job_id, worker_id)
+    outcome, claim = await _claim(pool, redis, job_id, worker_id, lock_token)
     if outcome == "finished":
         await redis.xack(STREAM, GROUP, msg_id)
         return
@@ -366,6 +405,19 @@ async def handle_message(
     await redis.xack(STREAM, GROUP, msg_id)
 
 
+# ZREM only if the entry still has the score we read. A worker may have rescheduled the job
+# (failed again, ZADD with a later score) between our XADD and our ZREM; a plain ZREM would then
+# delete the NEW entry, and the job would sit in 'retrying' with nothing left to run it (found by
+# the TLA+ model, spec/README.md). Scores are compared as numbers; repr() of a float round-trips.
+_ZREM_IF_SCORE = """
+local s = redis.call('ZSCORE', KEYS[1], ARGV[1])
+if s and tonumber(s) == tonumber(ARGV[2]) then
+  return redis.call('ZREM', KEYS[1], ARGV[1])
+end
+return 0
+"""
+
+
 async def move_due_jobs(
     pool: asyncpg.Pool, redis: Redis, now: float | None = None, batch: int = 100
 ) -> int:
@@ -373,12 +425,13 @@ async def move_due_jobs(
     time has come from the delayed set back onto the stream.
 
     XADD first, ZREM second: a crash in between re-delivers the job (a safe duplicate) instead of
-    losing it. The job row is the source for the stream fields, so they cannot go stale.
+    losing it. The ZREM is conditional on the score (see _ZREM_IF_SCORE). The job row is the
+    source for the stream fields, so they cannot go stale.
     """
     now = time.time() if now is None else now
-    due = await redis.zrangebyscore(DELAYED_KEY, "-inf", now, start=0, num=batch)
+    due = await redis.zrangebyscore(DELAYED_KEY, "-inf", now, start=0, num=batch, withscores=True)
     moved = 0
-    for job_id in due:
+    for job_id, score in due:
         row = await pool.fetchrow(
             "SELECT id, type, payload, status FROM jobs WHERE id = $1", UUID(job_id)
         )
@@ -387,7 +440,7 @@ async def move_due_jobs(
                 STREAM, {"job_id": job_id, "type": row["type"], "payload": row["payload"]}
             )
             moved += 1
-        await redis.zrem(DELAYED_KEY, job_id)
+        await redis.eval(_ZREM_IF_SCORE, 1, DELAYED_KEY, job_id, repr(score))
     return moved
 
 
@@ -436,6 +489,7 @@ async def worker_loop(
     after_complete: Callable[[UUID], Awaitable[None]] | None = None,
     provider_timeout: float | None = None,
     extras: WorkerExtras | None = None,
+    lock_token: str | None = None,
 ) -> None:
     recovery = recovery or RecoveryConfig()
     extras = extras or WorkerExtras()
@@ -467,6 +521,7 @@ async def worker_loop(
                         after_complete,
                         provider_timeout,
                         extras,
+                        lock_token,
                     )
 
             resp = await redis.xreadgroup(GROUP, worker_id, {STREAM: ">"}, count=1, block=block_ms)
@@ -494,6 +549,7 @@ async def worker_loop(
                         after_complete,
                         provider_timeout,
                         extras,
+                        lock_token,
                     )
         except ResponseError as e:
             if "NOGROUP" in str(e):
@@ -560,9 +616,13 @@ class WorkerPool:
         )
 
     async def start_worker(self, wid: str) -> None:
-        """Start one worker with its heartbeat. Also used to replace a killed worker."""
+        """Start one worker with its heartbeat. Also used to replace a killed worker.
+
+        Every start gets a fresh lock token, also when the name is reused (a process restart
+        starts again at worker-1): see _held_by_other."""
+        token = uuid.uuid4().hex
         # Beat once BEFORE the worker can read a message, so it never looks dead at start.
-        await beat(self.redis, wid, self.recovery.heartbeat_ttl)
+        await beat(self.redis, wid, self.recovery.heartbeat_ttl, token)
         self.heartbeats[wid] = asyncio.create_task(
             heartbeat_loop(
                 self.redis,
@@ -571,6 +631,7 @@ class WorkerPool:
                 self.recovery.heartbeat_interval,
                 self.recovery.heartbeat_ttl,
                 self.gate,
+                token,
             ),
             name=f"{wid}-heartbeat",
         )
@@ -587,6 +648,7 @@ class WorkerPool:
                 self.after_complete,
                 self.provider_timeout,
                 self.extras,
+                token,
             ),
             name=wid,
         )
