@@ -22,8 +22,8 @@ async def replay_dlq(pool: asyncpg.Pool, redis: Redis, job_id: UUID | str) -> bo
         reset = await conn.fetchval(
             """
             UPDATE jobs
-            SET status = 'queued', attempts = 0, locked_by = NULL, started_at = NULL,
-                completed_at = NULL, updated_at = now()
+            SET status = 'queued', attempts = 0, locked_by = NULL, lock_token = NULL,
+                started_at = NULL, completed_at = NULL, updated_at = now()
             WHERE id = $1 AND status = 'dead'
             RETURNING id
             """,

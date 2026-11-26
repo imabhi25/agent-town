@@ -1,0 +1,302 @@
+Error: Temporal properties GoalFinishes and StreamDrains were violated.
+
+Error: The following behavior constitutes a counter-example:
+
+State 1: <Initial predicate>
+/\ outputs = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ zver = 0
+/\ mover = [job |-> "none", ver |-> 0]
+/\ perrs = 0
+/\ lockedBy = [t1 |-> "none", t2 |-> "none", t3 |-> "none"]
+/\ pc = ( w1 :> [step |-> "idle", msg |-> 0, seen |-> {}] @@
+  w2 :> [step |-> "idle", msg |-> 0, seen |-> {}] )
+/\ disp = "none"
+/\ faults = 0
+/\ jobStatus = [t1 |-> "queued", t2 |-> "queued", t3 |-> "none"]
+/\ outbox = {"t1", "t2"}
+/\ msgs = <<>>
+/\ token = (w1 :> 1 @@ w2 :> 1)
+/\ lockTok = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ hb = (w1 :> TRUE @@ w2 :> TRUE)
+/\ delayed = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ taskStatus = [t1 |-> "queued", t2 |-> "queued", t3 |-> "pending"]
+
+State 2: <DispatchXadd line 109, col 5 to line 113, col 72 of module AgentTown>
+/\ outputs = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ zver = 0
+/\ mover = [job |-> "none", ver |-> 0]
+/\ perrs = 0
+/\ lockedBy = [t1 |-> "none", t2 |-> "none", t3 |-> "none"]
+/\ pc = ( w1 :> [step |-> "idle", msg |-> 0, seen |-> {}] @@
+  w2 :> [step |-> "idle", msg |-> 0, seen |-> {}] )
+/\ disp = "t2"
+/\ faults = 0
+/\ jobStatus = [t1 |-> "queued", t2 |-> "queued", t3 |-> "none"]
+/\ outbox = {"t1", "t2"}
+/\ msgs = <<[job |-> "t2", delivered |-> FALSE, acked |-> FALSE]>>
+/\ token = (w1 :> 1 @@ w2 :> 1)
+/\ lockTok = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ hb = (w1 :> TRUE @@ w2 :> TRUE)
+/\ delayed = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ taskStatus = [t1 |-> "queued", t2 |-> "queued", t3 |-> "pending"]
+
+State 3: <DispatchCommit line 116, col 5 to line 120, col 55 of module AgentTown>
+/\ outputs = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ zver = 0
+/\ mover = [job |-> "none", ver |-> 0]
+/\ perrs = 0
+/\ lockedBy = [t1 |-> "none", t2 |-> "none", t3 |-> "none"]
+/\ pc = ( w1 :> [step |-> "idle", msg |-> 0, seen |-> {}] @@
+  w2 :> [step |-> "idle", msg |-> 0, seen |-> {}] )
+/\ disp = "none"
+/\ faults = 0
+/\ jobStatus = [t1 |-> "queued", t2 |-> "queued", t3 |-> "none"]
+/\ outbox = {"t1"}
+/\ msgs = <<[job |-> "t2", delivered |-> FALSE, acked |-> FALSE]>>
+/\ token = (w1 :> 1 @@ w2 :> 1)
+/\ lockTok = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ hb = (w1 :> TRUE @@ w2 :> TRUE)
+/\ delayed = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ taskStatus = [t1 |-> "queued", t2 |-> "queued", t3 |-> "pending"]
+
+State 4: <DispatchXadd line 109, col 5 to line 113, col 72 of module AgentTown>
+/\ outputs = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ zver = 0
+/\ mover = [job |-> "none", ver |-> 0]
+/\ perrs = 0
+/\ lockedBy = [t1 |-> "none", t2 |-> "none", t3 |-> "none"]
+/\ pc = ( w1 :> [step |-> "idle", msg |-> 0, seen |-> {}] @@
+  w2 :> [step |-> "idle", msg |-> 0, seen |-> {}] )
+/\ disp = "t1"
+/\ faults = 0
+/\ jobStatus = [t1 |-> "queued", t2 |-> "queued", t3 |-> "none"]
+/\ outbox = {"t1"}
+/\ msgs = << [job |-> "t2", delivered |-> FALSE, acked |-> FALSE],
+   [job |-> "t1", delivered |-> FALSE, acked |-> FALSE] >>
+/\ token = (w1 :> 1 @@ w2 :> 1)
+/\ lockTok = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ hb = (w1 :> TRUE @@ w2 :> TRUE)
+/\ delayed = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ taskStatus = [t1 |-> "queued", t2 |-> "queued", t3 |-> "pending"]
+
+State 5: <WorkerStep(w1) line 291, col 8 to line 291, col 57 of module AgentTown>
+/\ outputs = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ zver = 0
+/\ mover = [job |-> "none", ver |-> 0]
+/\ perrs = 0
+/\ lockedBy = [t1 |-> "none", t2 |-> "none", t3 |-> "none"]
+/\ pc = ( w1 :> [step |-> "claim", msg |-> 1, seen |-> {}] @@
+  w2 :> [step |-> "idle", msg |-> 0, seen |-> {}] )
+/\ disp = "t1"
+/\ faults = 0
+/\ jobStatus = [t1 |-> "queued", t2 |-> "queued", t3 |-> "none"]
+/\ outbox = {"t1"}
+/\ msgs = << [job |-> "t2", delivered |-> TRUE, acked |-> FALSE],
+   [job |-> "t1", delivered |-> FALSE, acked |-> FALSE] >>
+/\ token = (w1 :> 1 @@ w2 :> 1)
+/\ lockTok = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ hb = (w1 :> TRUE @@ w2 :> TRUE)
+/\ delayed = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ taskStatus = [t1 |-> "queued", t2 |-> "queued", t3 |-> "pending"]
+
+State 6: <DispatchCommit line 116, col 5 to line 120, col 55 of module AgentTown>
+/\ outputs = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ zver = 0
+/\ mover = [job |-> "none", ver |-> 0]
+/\ perrs = 0
+/\ lockedBy = [t1 |-> "none", t2 |-> "none", t3 |-> "none"]
+/\ pc = ( w1 :> [step |-> "claim", msg |-> 1, seen |-> {}] @@
+  w2 :> [step |-> "idle", msg |-> 0, seen |-> {}] )
+/\ disp = "none"
+/\ faults = 0
+/\ jobStatus = [t1 |-> "queued", t2 |-> "queued", t3 |-> "none"]
+/\ outbox = {}
+/\ msgs = << [job |-> "t2", delivered |-> TRUE, acked |-> FALSE],
+   [job |-> "t1", delivered |-> FALSE, acked |-> FALSE] >>
+/\ token = (w1 :> 1 @@ w2 :> 1)
+/\ lockTok = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ hb = (w1 :> TRUE @@ w2 :> TRUE)
+/\ delayed = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ taskStatus = [t1 |-> "queued", t2 |-> "queued", t3 |-> "pending"]
+
+State 7: <Claim(w1) line 180, col 5 to line 200, col 59 of module AgentTown>
+/\ outputs = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ zver = 0
+/\ mover = [job |-> "none", ver |-> 0]
+/\ perrs = 0
+/\ lockedBy = [t1 |-> "none", t2 |-> w1, t3 |-> "none"]
+/\ pc = ( w1 :> [step |-> "complete", msg |-> 1, seen |-> {}] @@
+  w2 :> [step |-> "idle", msg |-> 0, seen |-> {}] )
+/\ disp = "none"
+/\ faults = 0
+/\ jobStatus = [t1 |-> "queued", t2 |-> "running", t3 |-> "none"]
+/\ outbox = {}
+/\ msgs = << [job |-> "t2", delivered |-> TRUE, acked |-> FALSE],
+   [job |-> "t1", delivered |-> FALSE, acked |-> FALSE] >>
+/\ token = (w1 :> 1 @@ w2 :> 1)
+/\ lockTok = [t1 |-> 0, t2 |-> 1, t3 |-> 0]
+/\ hb = (w1 :> TRUE @@ w2 :> TRUE)
+/\ delayed = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ taskStatus = [t1 |-> "queued", t2 |-> "queued", t3 |-> "pending"]
+
+State 8: <Crash(w1) line 270, col 5 to line 276, col 60 of module AgentTown>
+/\ outputs = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ zver = 0
+/\ mover = [job |-> "none", ver |-> 0]
+/\ perrs = 0
+/\ lockedBy = [t1 |-> "none", t2 |-> w1, t3 |-> "none"]
+/\ pc = ( w1 :> [step |-> "idle", msg |-> 0, seen |-> {}] @@
+  w2 :> [step |-> "idle", msg |-> 0, seen |-> {}] )
+/\ disp = "none"
+/\ faults = 1
+/\ jobStatus = [t1 |-> "queued", t2 |-> "running", t3 |-> "none"]
+/\ outbox = {}
+/\ msgs = << [job |-> "t2", delivered |-> TRUE, acked |-> FALSE],
+   [job |-> "t1", delivered |-> FALSE, acked |-> FALSE] >>
+/\ token = (w1 :> 2 @@ w2 :> 1)
+/\ lockTok = [t1 |-> 0, t2 |-> 1, t3 |-> 0]
+/\ hb = (w1 :> TRUE @@ w2 :> TRUE)
+/\ delayed = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ taskStatus = [t1 |-> "queued", t2 |-> "queued", t3 |-> "pending"]
+
+State 9: <WorkerStep(w1) line 291, col 8 to line 291, col 57 of module AgentTown>
+/\ outputs = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ zver = 0
+/\ mover = [job |-> "none", ver |-> 0]
+/\ perrs = 0
+/\ lockedBy = [t1 |-> "none", t2 |-> w1, t3 |-> "none"]
+/\ pc = ( w1 :> [step |-> "claim", msg |-> 2, seen |-> {}] @@
+  w2 :> [step |-> "idle", msg |-> 0, seen |-> {}] )
+/\ disp = "none"
+/\ faults = 1
+/\ jobStatus = [t1 |-> "queued", t2 |-> "running", t3 |-> "none"]
+/\ outbox = {}
+/\ msgs = << [job |-> "t2", delivered |-> TRUE, acked |-> FALSE],
+   [job |-> "t1", delivered |-> TRUE, acked |-> FALSE] >>
+/\ token = (w1 :> 2 @@ w2 :> 1)
+/\ lockTok = [t1 |-> 0, t2 |-> 1, t3 |-> 0]
+/\ hb = (w1 :> TRUE @@ w2 :> TRUE)
+/\ delayed = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ taskStatus = [t1 |-> "queued", t2 |-> "queued", t3 |-> "pending"]
+
+State 10: <WorkerStep(w2) line 291, col 8 to line 291, col 57 of module AgentTown>
+/\ outputs = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ zver = 0
+/\ mover = [job |-> "none", ver |-> 0]
+/\ perrs = 0
+/\ lockedBy = [t1 |-> "none", t2 |-> w1, t3 |-> "none"]
+/\ pc = ( w1 :> [step |-> "claim", msg |-> 2, seen |-> {}] @@
+  w2 :> [step |-> "claim", msg |-> 2, seen |-> {}] )
+/\ disp = "none"
+/\ faults = 1
+/\ jobStatus = [t1 |-> "queued", t2 |-> "running", t3 |-> "none"]
+/\ outbox = {}
+/\ msgs = << [job |-> "t2", delivered |-> TRUE, acked |-> FALSE],
+   [job |-> "t1", delivered |-> TRUE, acked |-> FALSE] >>
+/\ token = (w1 :> 2 @@ w2 :> 1)
+/\ lockTok = [t1 |-> 0, t2 |-> 1, t3 |-> 0]
+/\ hb = (w1 :> TRUE @@ w2 :> TRUE)
+/\ delayed = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ taskStatus = [t1 |-> "queued", t2 |-> "queued", t3 |-> "pending"]
+
+State 11: <Claim(w2) line 180, col 5 to line 200, col 59 of module AgentTown>
+/\ outputs = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ zver = 0
+/\ mover = [job |-> "none", ver |-> 0]
+/\ perrs = 0
+/\ lockedBy = [t1 |-> w2, t2 |-> w1, t3 |-> "none"]
+/\ pc = ( w1 :> [step |-> "claim", msg |-> 2, seen |-> {}] @@
+  w2 :> [step |-> "complete", msg |-> 2, seen |-> {}] )
+/\ disp = "none"
+/\ faults = 1
+/\ jobStatus = [t1 |-> "running", t2 |-> "running", t3 |-> "none"]
+/\ outbox = {}
+/\ msgs = << [job |-> "t2", delivered |-> TRUE, acked |-> FALSE],
+   [job |-> "t1", delivered |-> TRUE, acked |-> FALSE] >>
+/\ token = (w1 :> 2 @@ w2 :> 1)
+/\ lockTok = [t1 |-> 1, t2 |-> 1, t3 |-> 0]
+/\ hb = (w1 :> TRUE @@ w2 :> TRUE)
+/\ delayed = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ taskStatus = [t1 |-> "queued", t2 |-> "queued", t3 |-> "pending"]
+
+State 12: <Crash(w2) line 270, col 5 to line 276, col 60 of module AgentTown>
+/\ outputs = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ zver = 0
+/\ mover = [job |-> "none", ver |-> 0]
+/\ perrs = 0
+/\ lockedBy = [t1 |-> w2, t2 |-> w1, t3 |-> "none"]
+/\ pc = ( w1 :> [step |-> "claim", msg |-> 2, seen |-> {}] @@
+  w2 :> [step |-> "idle", msg |-> 0, seen |-> {}] )
+/\ disp = "none"
+/\ faults = 2
+/\ jobStatus = [t1 |-> "running", t2 |-> "running", t3 |-> "none"]
+/\ outbox = {}
+/\ msgs = << [job |-> "t2", delivered |-> TRUE, acked |-> FALSE],
+   [job |-> "t1", delivered |-> TRUE, acked |-> FALSE] >>
+/\ token = (w1 :> 2 @@ w2 :> 2)
+/\ lockTok = [t1 |-> 1, t2 |-> 1, t3 |-> 0]
+/\ hb = (w1 :> TRUE @@ w2 :> TRUE)
+/\ delayed = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ taskStatus = [t1 |-> "queued", t2 |-> "queued", t3 |-> "pending"]
+
+State 13: <Claim(w1) line 180, col 5 to line 200, col 59 of module AgentTown>
+/\ outputs = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ zver = 0
+/\ mover = [job |-> "none", ver |-> 0]
+/\ perrs = 0
+/\ lockedBy = [t1 |-> w2, t2 |-> w1, t3 |-> "none"]
+/\ pc = ( w1 :> [step |-> "idle", msg |-> 0, seen |-> {}] @@
+  w2 :> [step |-> "idle", msg |-> 0, seen |-> {}] )
+/\ disp = "none"
+/\ faults = 2
+/\ jobStatus = [t1 |-> "running", t2 |-> "running", t3 |-> "none"]
+/\ outbox = {}
+/\ msgs = << [job |-> "t2", delivered |-> TRUE, acked |-> FALSE],
+   [job |-> "t1", delivered |-> TRUE, acked |-> FALSE] >>
+/\ token = (w1 :> 2 @@ w2 :> 2)
+/\ lockTok = [t1 |-> 1, t2 |-> 1, t3 |-> 0]
+/\ hb = (w1 :> TRUE @@ w2 :> TRUE)
+/\ delayed = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ taskStatus = [t1 |-> "queued", t2 |-> "queued", t3 |-> "pending"]
+
+State 14: <WorkerStep(w2) line 291, col 8 to line 291, col 57 of module AgentTown>
+/\ outputs = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ zver = 0
+/\ mover = [job |-> "none", ver |-> 0]
+/\ perrs = 0
+/\ lockedBy = [t1 |-> w2, t2 |-> w1, t3 |-> "none"]
+/\ pc = ( w1 :> [step |-> "idle", msg |-> 0, seen |-> {}] @@
+  w2 :> [step |-> "claim", msg |-> 1, seen |-> {}] )
+/\ disp = "none"
+/\ faults = 2
+/\ jobStatus = [t1 |-> "running", t2 |-> "running", t3 |-> "none"]
+/\ outbox = {}
+/\ msgs = << [job |-> "t2", delivered |-> TRUE, acked |-> FALSE],
+   [job |-> "t1", delivered |-> TRUE, acked |-> FALSE] >>
+/\ token = (w1 :> 2 @@ w2 :> 2)
+/\ lockTok = [t1 |-> 1, t2 |-> 1, t3 |-> 0]
+/\ hb = (w1 :> TRUE @@ w2 :> TRUE)
+/\ delayed = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ taskStatus = [t1 |-> "queued", t2 |-> "queued", t3 |-> "pending"]
+
+State 15: <Claim(w2) line 180, col 5 to line 200, col 59 of module AgentTown>
+/\ outputs = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ zver = 0
+/\ mover = [job |-> "none", ver |-> 0]
+/\ perrs = 0
+/\ lockedBy = [t1 |-> w2, t2 |-> w1, t3 |-> "none"]
+/\ pc = ( w1 :> [step |-> "idle", msg |-> 0, seen |-> {}] @@
+  w2 :> [step |-> "idle", msg |-> 0, seen |-> {}] )
+/\ disp = "none"
+/\ faults = 2
+/\ jobStatus = [t1 |-> "running", t2 |-> "running", t3 |-> "none"]
+/\ outbox = {}
+/\ msgs = << [job |-> "t2", delivered |-> TRUE, acked |-> FALSE],
+   [job |-> "t1", delivered |-> TRUE, acked |-> FALSE] >>
+/\ token = (w1 :> 2 @@ w2 :> 2)
+/\ lockTok = [t1 |-> 1, t2 |-> 1, t3 |-> 0]
+/\ hb = (w1 :> TRUE @@ w2 :> TRUE)
+/\ delayed = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ taskStatus = [t1 |-> "queued", t2 |-> "queued", t3 |-> "pending"]
+
+Back to state 12: <WorkerStep(w1) line 291, col 8 to line 291, col 57 of module AgentTown>
