@@ -1,0 +1,242 @@
+Error: Invariant NoStuckTask is violated.
+Error: The behavior up to this point is:
+State 1: <Initial predicate>
+/\ outputs = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ zver = 0
+/\ mover = [job |-> "none", ver |-> 0]
+/\ perrs = 0
+/\ lockedBy = [t1 |-> "none", t2 |-> "none", t3 |-> "none"]
+/\ pc = ( w1 :> [step |-> "idle", msg |-> 0, seen |-> {}] @@
+  w2 :> [step |-> "idle", msg |-> 0, seen |-> {}] )
+/\ disp = "none"
+/\ faults = 0
+/\ jobStatus = [t1 |-> "queued", t2 |-> "queued", t3 |-> "none"]
+/\ outbox = {"t1", "t2"}
+/\ msgs = <<>>
+/\ token = (w1 :> 1 @@ w2 :> 1)
+/\ lockTok = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ hb = (w1 :> TRUE @@ w2 :> TRUE)
+/\ delayed = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ taskStatus = [t1 |-> "queued", t2 |-> "queued", t3 |-> "pending"]
+
+State 2: <DispatchXadd line 109, col 5 to line 113, col 72 of module AgentTown>
+/\ outputs = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ zver = 0
+/\ mover = [job |-> "none", ver |-> 0]
+/\ perrs = 0
+/\ lockedBy = [t1 |-> "none", t2 |-> "none", t3 |-> "none"]
+/\ pc = ( w1 :> [step |-> "idle", msg |-> 0, seen |-> {}] @@
+  w2 :> [step |-> "idle", msg |-> 0, seen |-> {}] )
+/\ disp = "t1"
+/\ faults = 0
+/\ jobStatus = [t1 |-> "queued", t2 |-> "queued", t3 |-> "none"]
+/\ outbox = {"t1", "t2"}
+/\ msgs = <<[job |-> "t1", delivered |-> FALSE, acked |-> FALSE]>>
+/\ token = (w1 :> 1 @@ w2 :> 1)
+/\ lockTok = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ hb = (w1 :> TRUE @@ w2 :> TRUE)
+/\ delayed = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ taskStatus = [t1 |-> "queued", t2 |-> "queued", t3 |-> "pending"]
+
+State 3: <WorkerStep(w1) line 291, col 8 to line 291, col 57 of module AgentTown>
+/\ outputs = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ zver = 0
+/\ mover = [job |-> "none", ver |-> 0]
+/\ perrs = 0
+/\ lockedBy = [t1 |-> "none", t2 |-> "none", t3 |-> "none"]
+/\ pc = ( w1 :> [step |-> "claim", msg |-> 1, seen |-> {}] @@
+  w2 :> [step |-> "idle", msg |-> 0, seen |-> {}] )
+/\ disp = "t1"
+/\ faults = 0
+/\ jobStatus = [t1 |-> "queued", t2 |-> "queued", t3 |-> "none"]
+/\ outbox = {"t1", "t2"}
+/\ msgs = <<[job |-> "t1", delivered |-> TRUE, acked |-> FALSE]>>
+/\ token = (w1 :> 1 @@ w2 :> 1)
+/\ lockTok = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ hb = (w1 :> TRUE @@ w2 :> TRUE)
+/\ delayed = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ taskStatus = [t1 |-> "queued", t2 |-> "queued", t3 |-> "pending"]
+
+State 4: <Claim(w1) line 180, col 5 to line 200, col 59 of module AgentTown>
+/\ outputs = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ zver = 0
+/\ mover = [job |-> "none", ver |-> 0]
+/\ perrs = 0
+/\ lockedBy = [t1 |-> w1, t2 |-> "none", t3 |-> "none"]
+/\ pc = ( w1 :> [step |-> "read", msg |-> 1, seen |-> {}] @@
+  w2 :> [step |-> "idle", msg |-> 0, seen |-> {}] )
+/\ disp = "t1"
+/\ faults = 0
+/\ jobStatus = [t1 |-> "running", t2 |-> "queued", t3 |-> "none"]
+/\ outbox = {"t1", "t2"}
+/\ msgs = <<[job |-> "t1", delivered |-> TRUE, acked |-> FALSE]>>
+/\ token = (w1 :> 1 @@ w2 :> 1)
+/\ lockTok = [t1 |-> 1, t2 |-> 0, t3 |-> 0]
+/\ hb = (w1 :> TRUE @@ w2 :> TRUE)
+/\ delayed = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ taskStatus = [t1 |-> "queued", t2 |-> "queued", t3 |-> "pending"]
+
+State 5: <DispatchCommit line 116, col 5 to line 120, col 55 of module AgentTown>
+/\ outputs = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ zver = 0
+/\ mover = [job |-> "none", ver |-> 0]
+/\ perrs = 0
+/\ lockedBy = [t1 |-> w1, t2 |-> "none", t3 |-> "none"]
+/\ pc = ( w1 :> [step |-> "read", msg |-> 1, seen |-> {}] @@
+  w2 :> [step |-> "idle", msg |-> 0, seen |-> {}] )
+/\ disp = "none"
+/\ faults = 0
+/\ jobStatus = [t1 |-> "running", t2 |-> "queued", t3 |-> "none"]
+/\ outbox = {"t2"}
+/\ msgs = <<[job |-> "t1", delivered |-> TRUE, acked |-> FALSE]>>
+/\ token = (w1 :> 1 @@ w2 :> 1)
+/\ lockTok = [t1 |-> 1, t2 |-> 0, t3 |-> 0]
+/\ hb = (w1 :> TRUE @@ w2 :> TRUE)
+/\ delayed = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ taskStatus = [t1 |-> "queued", t2 |-> "queued", t3 |-> "pending"]
+
+State 6: <DispatchXadd line 109, col 5 to line 113, col 72 of module AgentTown>
+/\ outputs = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ zver = 0
+/\ mover = [job |-> "none", ver |-> 0]
+/\ perrs = 0
+/\ lockedBy = [t1 |-> w1, t2 |-> "none", t3 |-> "none"]
+/\ pc = ( w1 :> [step |-> "read", msg |-> 1, seen |-> {}] @@
+  w2 :> [step |-> "idle", msg |-> 0, seen |-> {}] )
+/\ disp = "t2"
+/\ faults = 0
+/\ jobStatus = [t1 |-> "running", t2 |-> "queued", t3 |-> "none"]
+/\ outbox = {"t2"}
+/\ msgs = << [job |-> "t1", delivered |-> TRUE, acked |-> FALSE],
+   [job |-> "t2", delivered |-> FALSE, acked |-> FALSE] >>
+/\ token = (w1 :> 1 @@ w2 :> 1)
+/\ lockTok = [t1 |-> 1, t2 |-> 0, t3 |-> 0]
+/\ hb = (w1 :> TRUE @@ w2 :> TRUE)
+/\ delayed = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ taskStatus = [t1 |-> "queued", t2 |-> "queued", t3 |-> "pending"]
+
+State 7: <WorkerStep(w2) line 291, col 8 to line 291, col 57 of module AgentTown>
+/\ outputs = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ zver = 0
+/\ mover = [job |-> "none", ver |-> 0]
+/\ perrs = 0
+/\ lockedBy = [t1 |-> w1, t2 |-> "none", t3 |-> "none"]
+/\ pc = ( w1 :> [step |-> "read", msg |-> 1, seen |-> {}] @@
+  w2 :> [step |-> "claim", msg |-> 2, seen |-> {}] )
+/\ disp = "t2"
+/\ faults = 0
+/\ jobStatus = [t1 |-> "running", t2 |-> "queued", t3 |-> "none"]
+/\ outbox = {"t2"}
+/\ msgs = << [job |-> "t1", delivered |-> TRUE, acked |-> FALSE],
+   [job |-> "t2", delivered |-> TRUE, acked |-> FALSE] >>
+/\ token = (w1 :> 1 @@ w2 :> 1)
+/\ lockTok = [t1 |-> 1, t2 |-> 0, t3 |-> 0]
+/\ hb = (w1 :> TRUE @@ w2 :> TRUE)
+/\ delayed = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ taskStatus = [t1 |-> "queued", t2 |-> "queued", t3 |-> "pending"]
+
+State 8: <Claim(w2) line 180, col 5 to line 200, col 59 of module AgentTown>
+/\ outputs = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ zver = 0
+/\ mover = [job |-> "none", ver |-> 0]
+/\ perrs = 0
+/\ lockedBy = [t1 |-> w1, t2 |-> w2, t3 |-> "none"]
+/\ pc = ( w1 :> [step |-> "read", msg |-> 1, seen |-> {}] @@
+  w2 :> [step |-> "read", msg |-> 2, seen |-> {}] )
+/\ disp = "t2"
+/\ faults = 0
+/\ jobStatus = [t1 |-> "running", t2 |-> "running", t3 |-> "none"]
+/\ outbox = {"t2"}
+/\ msgs = << [job |-> "t1", delivered |-> TRUE, acked |-> FALSE],
+   [job |-> "t2", delivered |-> TRUE, acked |-> FALSE] >>
+/\ token = (w1 :> 1 @@ w2 :> 1)
+/\ lockTok = [t1 |-> 1, t2 |-> 1, t3 |-> 0]
+/\ hb = (w1 :> TRUE @@ w2 :> TRUE)
+/\ delayed = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ taskStatus = [t1 |-> "queued", t2 |-> "queued", t3 |-> "pending"]
+
+State 9: <CompleteRead(w2) line 231, col 5 to line 233, col 80 of module AgentTown>
+/\ outputs = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ zver = 0
+/\ mover = [job |-> "none", ver |-> 0]
+/\ perrs = 0
+/\ lockedBy = [t1 |-> w1, t2 |-> w2, t3 |-> "none"]
+/\ pc = ( w1 :> [step |-> "read", msg |-> 1, seen |-> {}] @@
+  w2 :> [step |-> "commit", msg |-> 2, seen |-> {}] )
+/\ disp = "t2"
+/\ faults = 0
+/\ jobStatus = [t1 |-> "running", t2 |-> "running", t3 |-> "none"]
+/\ outbox = {"t2"}
+/\ msgs = << [job |-> "t1", delivered |-> TRUE, acked |-> FALSE],
+   [job |-> "t2", delivered |-> TRUE, acked |-> FALSE] >>
+/\ token = (w1 :> 1 @@ w2 :> 1)
+/\ lockTok = [t1 |-> 1, t2 |-> 1, t3 |-> 0]
+/\ hb = (w1 :> TRUE @@ w2 :> TRUE)
+/\ delayed = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ taskStatus = [t1 |-> "queued", t2 |-> "queued", t3 |-> "pending"]
+
+State 10: <CompleteRead(w1) line 231, col 5 to line 233, col 80 of module AgentTown>
+/\ outputs = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ zver = 0
+/\ mover = [job |-> "none", ver |-> 0]
+/\ perrs = 0
+/\ lockedBy = [t1 |-> w1, t2 |-> w2, t3 |-> "none"]
+/\ pc = ( w1 :> [step |-> "commit", msg |-> 1, seen |-> {}] @@
+  w2 :> [step |-> "commit", msg |-> 2, seen |-> {}] )
+/\ disp = "t2"
+/\ faults = 0
+/\ jobStatus = [t1 |-> "running", t2 |-> "running", t3 |-> "none"]
+/\ outbox = {"t2"}
+/\ msgs = << [job |-> "t1", delivered |-> TRUE, acked |-> FALSE],
+   [job |-> "t2", delivered |-> TRUE, acked |-> FALSE] >>
+/\ token = (w1 :> 1 @@ w2 :> 1)
+/\ lockTok = [t1 |-> 1, t2 |-> 1, t3 |-> 0]
+/\ hb = (w1 :> TRUE @@ w2 :> TRUE)
+/\ delayed = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ taskStatus = [t1 |-> "queued", t2 |-> "queued", t3 |-> "pending"]
+
+State 11: <CompleteCommit(w1) line 237, col 5 to line 240, col 72 of module AgentTown>
+/\ outputs = [t1 |-> 1, t2 |-> 0, t3 |-> 0]
+/\ zver = 0
+/\ mover = [job |-> "none", ver |-> 0]
+/\ perrs = 0
+/\ lockedBy = [t1 |-> w1, t2 |-> w2, t3 |-> "none"]
+/\ pc = ( w1 :> [step |-> "ack", msg |-> 1, seen |-> {}] @@
+  w2 :> [step |-> "commit", msg |-> 2, seen |-> {}] )
+/\ disp = "t2"
+/\ faults = 0
+/\ jobStatus = [t1 |-> "succeeded", t2 |-> "running", t3 |-> "none"]
+/\ outbox = {"t2"}
+/\ msgs = << [job |-> "t1", delivered |-> TRUE, acked |-> FALSE],
+   [job |-> "t2", delivered |-> TRUE, acked |-> FALSE] >>
+/\ token = (w1 :> 1 @@ w2 :> 1)
+/\ lockTok = [t1 |-> 1, t2 |-> 1, t3 |-> 0]
+/\ hb = (w1 :> TRUE @@ w2 :> TRUE)
+/\ delayed = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ taskStatus = [t1 |-> "succeeded", t2 |-> "queued", t3 |-> "pending"]
+
+State 12: <CompleteCommit(w2) line 237, col 5 to line 240, col 72 of module AgentTown>
+/\ outputs = [t1 |-> 1, t2 |-> 1, t3 |-> 0]
+/\ zver = 0
+/\ mover = [job |-> "none", ver |-> 0]
+/\ perrs = 0
+/\ lockedBy = [t1 |-> w1, t2 |-> w2, t3 |-> "none"]
+/\ pc = ( w1 :> [step |-> "ack", msg |-> 1, seen |-> {}] @@
+  w2 :> [step |-> "ack", msg |-> 2, seen |-> {}] )
+/\ disp = "t2"
+/\ faults = 0
+/\ jobStatus = [t1 |-> "succeeded", t2 |-> "succeeded", t3 |-> "none"]
+/\ outbox = {"t2"}
+/\ msgs = << [job |-> "t1", delivered |-> TRUE, acked |-> FALSE],
+   [job |-> "t2", delivered |-> TRUE, acked |-> FALSE] >>
+/\ token = (w1 :> 1 @@ w2 :> 1)
+/\ lockTok = [t1 |-> 1, t2 |-> 1, t3 |-> 0]
+/\ hb = (w1 :> TRUE @@ w2 :> TRUE)
+/\ delayed = [t1 |-> 0, t2 |-> 0, t3 |-> 0]
+/\ taskStatus = [t1 |-> "succeeded", t2 |-> "succeeded", t3 |-> "pending"]
+
+1271 states generated, 598 distinct states found, 130 states left on queue.
+The depth of the complete state graph search is 13.
+Finished in 01s at (2026-11-26 19:02:08)
+Picked up JAVA_TOOL_OPTIONS: -Djavax.net.ssl.trustStore=/etc/ssl/certs/java/cacerts -Djavax.net.ssl.trustStoreType=JKS -Dhttps.proxyHost=127.0.0.1 -Dhttps.proxyPort=38291 -Dhttp.nonProxyHosts=localhost|127.0.0.1|::1|127.*|0.*|::|169.254.*|api.anthropic.com|api-staging.anthropic.com|api-pr-preview.anthropic.com|mcp-proxy.anthropic.com|mcp-proxy-staging.anthropic.com|registry.npmjs.org|jsr.io|npm.jsr.io|pypi.org|files.pythonhosted.org|index.crates.io|proxy.golang.org|host.docker.internal|10.*|172.16.*|172.17.*|172.18.*|172.19.*|172.20.*|172.21.*|172.22.*|172.23.*|172.24.*|172.25.*|172.26.*|172.27.*|172.28.*|172.29.*|172.30.*|172.31.*|192.168.*|100.64.0.0/10|*.svc.cluster.local|*.svc.cluster.local -Djdk.http.auth.tunneling.disabledSchemes= -Djdk.http.auth.proxying.disabledSchemes=
+Picked up _JAVA_OPTIONS: -XX:+UnlockDiagnosticVMOptions -XX:DisableIntrinsic=_base64_encodeBlock,_base64_decodeBlock

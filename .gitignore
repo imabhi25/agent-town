@@ -12,3 +12,4 @@ dump.rdb
 test-results/
 playwright-report/
 docs/reference/*.png
+.cache/

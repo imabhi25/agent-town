@@ -1,0 +1,7 @@
+{"variant": "correct_faults", "outcome": "ok", "states": 6513093, "distinct": 2128143, "depth": 31, "trace_length": null, "seconds": 155.6, "MaxFaults": 2, "MaxProviderErrors": 0, "expected": "ok", "as_expected": true}
+{"variant": "correct_errors", "outcome": "ok", "states": 2276605, "distinct": 697501, "depth": 40, "trace_length": null, "seconds": 50.3, "MaxFaults": 0, "MaxProviderErrors": 2, "expected": "ok", "as_expected": true}
+{"variant": "correct_mixed", "outcome": "ok", "states": 9749831, "distinct": 2846668, "depth": 36, "trace_length": null, "seconds": 206.2, "MaxFaults": 1, "MaxProviderErrors": 1, "expected": "ok", "as_expected": true}
+{"variant": "ack_before_commit", "outcome": "NoLostJob", "states": 443, "distinct": 241, "depth": 6, "trace_length": 6, "seconds": 0.8, "MaxFaults": 1, "MaxProviderErrors": 0, "expected": "NoLostJob", "as_expected": true}
+{"variant": "no_goal_lock", "outcome": "NoStuckTask", "states": 1271, "distinct": 598, "depth": 13, "trace_length": 12, "seconds": 1.2, "MaxFaults": 0, "MaxProviderErrors": 0, "expected": "NoStuckTask", "as_expected": true}
+{"variant": "plain_zrem", "outcome": "NoLostJob", "states": 17860, "distinct": 7614, "depth": 15, "trace_length": 15, "seconds": 2.2, "MaxFaults": 0, "MaxProviderErrors": 2, "expected": "NoLostJob", "as_expected": true}
+{"variant": "name_only_heartbeat", "outcome": "liveness", "states": 3330220, "distinct": 1168319, "depth": 23, "trace_length": 15, "seconds": 67.0, "MaxFaults": 2, "MaxProviderErrors": 0, "expected": "liveness", "as_expected": true}
