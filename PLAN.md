@@ -34,6 +34,8 @@
 - [x] `PLANNER=fixed|gemini` setting: presets only by default, no LLM or key needed (#17)
 - [x] Chaos campaign: worker/dispatcher processes and Redis killed with SIGKILL, Postgres-only checker, deliberately broken XACK-before-commit mode it must catch, README numbers generated from `results/chaos/campaign.jsonl`, small campaign in CI
 
+- [x] TLA+ model of delivery + task graph checked by TLC in CI, broken variants must fail; fixed the two bugs it found (retry-mover ZREM race, restarted-worker livelock via lock tokens)
+
 ## MVP done when
 Live URL; a prompt produces a plan and agents visibly work; kill-worker test passes in CI; benchmark numbers in README; demo works without Gemini quota (mock fallback).
 

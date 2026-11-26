@@ -287,3 +287,18 @@ rerun the script and ffmpeg.
 **Why the fault phase ends on a stall.** A broken run that lost jobs never finishes, so waiting for "all jobs done" would wait for the timeout. Faults stop when every job is done or nothing has finished for 4 s, then the survivors get a quiet drain period before the check, so a slow-but-correct run is not mistaken for a lost job.
 
 **CI.** A separate job runs 3 correct and 2 broken runs of 150 jobs on every pull request (about a minute) and uploads the JSON lines. It installs `redis-server` because the campaign must own a Redis it can kill; a GitHub service container cannot be killed and restarted from a step.
+
+## TLA+ model: checking the protocol exhaustively, not just by sampling
+**Why a model on top of the chaos campaign.** The campaign runs the real code under real crashes, but it only sees the interleavings that happen to occur. Bugs in a delivery protocol hide in narrow windows: between two Redis commands, or between two transactions. TLC explores every interleaving of a small model (2 workers, a 3-task diamond, a few crashes and provider errors) and checks the invariants in every reachable state. The two approaches cover each other's weak spots: the model can be wrong about the code, and the campaign can miss a rare window.
+
+**Why TLA+ and not a hand-written simulator.** TLA+ is the standard tool for this (used for DynamoDB, S3 and Azure Cosmos DB), and TLC checks liveness ("the goal always finishes") as well as safety. A homemade checker would have to be trusted on its own.
+
+**What a step is.** One Postgres transaction is one atomic step, because that is what a transaction guarantees. One Redis command is one step, so a crash can land between any two. Time is left out: "the lease ran out" is just "a reclaim may happen now". That allows more behaviours than real clocks do, so the model can only be stricter than reality.
+
+**Broken variants are part of the check.** Each design choice (ack after commit, the goal row lock, the conditional ZREM, the lock token) can be switched off by a constant, and `scripts/check_spec.py` fails unless TLC reports the expected counterexample for each one. This shows that every property depends on a design choice, and that the model is not passing trivially.
+
+**What it found.** Two real bugs, both fixed, each with a regression test (`tests/test_spec_findings.py`):
+- *Retry mover race.* `move_due_jobs` did XADD then a plain `ZREM`. If a worker rescheduled the job in between (it failed again and `ZADD`ed a later score), the `ZREM` deleted the new entry and the job was stranded in `retrying`. Fix: a Lua script removes the entry only if its score is still the one the mover read.
+- *Restarted-worker livelock.* "Busy" meant "a worker with that name has a heartbeat", and names are reused after a restart. A restarted worker looked like it was still running its old job, so other workers left that job alone. Fix: a lock token per worker start, carried by the heartbeat and stored on the job (`jobs.lock_token`). A job counts as busy only when the tokens match. This is a fencing-token idea. Rows locked before the migration fall back to the name check.
+
+**Why liveness needed fairness.** "Every goal finishes" can only hold if correct components keep taking steps and faults stop at some point. The spec states this as weak fairness on every non-fault action and a fixed fault budget. The livelock above is exactly a behaviour where every component keeps stepping and the goal still never finishes, which is why it counts as a bug and not as bad luck.

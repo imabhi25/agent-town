@@ -20,6 +20,12 @@ machine, one Python process, mock LLM at about 125 ms per call. They are not fre
    (deduplicated by id, ordered by time, refetch on gaps), plus recorded traces captured from the real
    engine so the site works instantly with no backend; 103 unit and 19 browser tests and CI on every PR.
 
+5. Wrote a TLA+ model of the engine's delivery protocol and task graph (outbox, Redis Streams,
+   crash/reclaim, retries) and model-checked it with TLC in CI; it found two real bugs the chaos tests
+   had missed (a retry-mover race that could strand a job, and a livelock when a worker restarted
+   under the same name), both fixed with regression tests, and every deliberately broken variant
+   produces a counterexample.
+
 ## 60-second walkthrough
 "Agent Town is a live map of a real job engine. You type a goal, a planner turns it into a graph of
 tasks, and workers pick them up through Redis Streams while the map shows every event as it happens.
@@ -41,6 +47,20 @@ backend in the background, and switches to live when it answers. Rate limits, a 
 daily caps keep it inside the free limits."
 
 ## Questions to be ready for
+- *Why TLA+ if you already have a chaos campaign?* The campaign samples interleavings; TLC tries all
+  of them in a small model. The two bugs it found both needed a step to land inside a window two
+  Redis commands wide, which 10,000 chaos jobs never hit. The model can be wrong about the code,
+  which is why the campaign stays: each covers the other's blind spot (spec/README.md).
+- *Walk me through one bug the model found.* The retry mover did XADD, then ZREM. In between, a
+  worker can take the new message, fail again, and ZADD a later score; the ZREM then deleted the
+  new entry and the job sat in `retrying` forever. Fix: remove only if the score is unchanged (Lua).
+- *What is a lock token / fencing token here?* Each worker start gets a random token, put in its
+  heartbeat and on the job it locks. "Someone is running this job" now means "the heartbeat of the
+  holder carries the token that took the lock", so a restarted worker with the same name no longer
+  looks like it still owns its old job.
+- *Safety vs liveness?* Safety: nothing bad happens (no duplicate output, no lost job), checked in
+  every state. Liveness: something good eventually happens (the goal finishes), checked over
+  infinite behaviours, and it needs a fairness assumption (components keep stepping, faults stop).
 - *Is delivery exactly-once?* Redis Streams redelivers unacknowledged messages, and a crash can happen
   between commit and XACK. The guarded update makes the second run a no-op. The result is one stored
   row per job; the external call may repeat.
