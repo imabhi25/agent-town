@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     # Mock provider latency range in seconds (overridable per job via payload `mock_latency`).
     mock_min_latency: float = 0.05
     mock_max_latency: float = 0.2
+    # How long the mock takes on a goal's task job (the "build time" of its building), reported
+    # in PROGRESS_STEPS steps as job.progress events. Real Gemini calls take their own time.
+    task_build_seconds: float = 4.0
     worker_block_ms: int = 500  # XREADGROUP BLOCK; the live profile raises it to save commands
     # --- protection (step 4) ---
     # Per-IP token bucket on POST /goals: burst, then refill per second.

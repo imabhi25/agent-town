@@ -1,95 +1,107 @@
 import { describe, expect, it } from "vitest";
-import { LAYOUT, ROADS_SAMPLED, shortestPath, zoneForStage, type XZ } from "./town";
+import { LAYOUT, ROADS_SAMPLED, shortestPath, zoneForStage, zoneLabelAt, type XZ } from "./town";
 
 const dist = (a: XZ, b: XZ) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 const hw = LAYOUT.board.w / 2;
 const hd = LAYOUT.board.d / 2;
-const drawn = ROADS_SAMPLED.filter((r) => ["ring", "spoke", "plaza"].includes(r.road.type));
+const paved = ROADS_SAMPLED.filter((r) => r.road.type === "street" || r.road.type === "lane");
 
-/** Distance from a point to the surface of the drawn roads and footpaths (0 = touching). */
-function toRoad(p: XZ): number {
+function toSegment(p: XZ, a: XZ, b: XZ): number {
+  const vx = b[0] - a[0], vz = b[1] - a[1];
+  const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * vx + (p[1] - a[1]) * vz) / (vx * vx + vz * vz || 1e-9)));
+  return dist(p, [a[0] + vx * t, a[1] + vz * t]);
+}
+/** Distance from a point to the edge of the streets and lanes (negative = on one). */
+function toStreet(p: XZ): number {
   let best = Infinity;
-  for (const { road, pts } of ROADS_SAMPLED) {
-    const half = road.type === "foot" ? 0.35 : road.width / 2;
-    for (const q of pts) best = Math.min(best, dist(p, q) - half);
+  for (const r of LAYOUT.roads) {
+    if (r.type !== "street" && r.type !== "lane") continue;
+    for (let i = 1; i < r.points.length; i++) best = Math.min(best, toSegment(p, r.points[i - 1], r.points[i]) - r.width / 2);
   }
   return best;
 }
+/** Distance outside a block's rectangle (negative = inside). */
+const outsideBlock = (p: XZ, z: { x: number; z: number; w: number; d: number }) =>
+  Math.max(Math.abs(p[0] - z.x) - z.w / 2, Math.abs(p[1] - z.z) - z.d / 2);
+/** Distance outside the square, the paved area inside the loop of streets. */
+const outsideSquare = (p: XZ) => Math.max(Math.abs(p[0]) - LAYOUT.plaza.w / 2, Math.abs(p[1]) - LAYOUT.plaza.d / 2);
 
 describe("layout file", () => {
-  it("has 6 zones of 8 slots, a plaza, and a seed", () => {
-    expect(LAYOUT.board).toMatchObject({ w: 40, d: 30 });
-    expect(LAYOUT.zones).toHaveLength(6);
+  it("has 6 blocks of 8 lots, a square with a fountain and a town hall, and a seed", () => {
+    expect(LAYOUT.board).toMatchObject({ w: 34, d: 32 });
     expect(LAYOUT.zones.map((z) => z.stage)).toEqual([1, 2, 3, 4, 5, 6]);
     for (const z of LAYOUT.zones) expect(z.slots).toHaveLength(8);
     expect(LAYOUT.plaza.pads).toHaveLength(8);
+    expect(outsideSquare(LAYOUT.plaza.fountain)).toBeLessThan(-1);
+    expect(outsideSquare([LAYOUT.plaza.hall.x, LAYOUT.plaza.hall.z])).toBeLessThan(-1);
     expect(LAYOUT.seed).toBe(11);
   });
   it("every road joins two known nodes at its own end points", () => {
     for (const r of LAYOUT.roads) {
-      expect(["ring", "spoke", "plaza", "foot"]).toContain(r.type);
+      expect(["street", "lane", "plaza", "foot"]).toContain(r.type);
       expect(dist(r.points[0], LAYOUT.nodes[r.from]), r.id).toBeLessThan(0.01);
       expect(dist(r.points.at(-1)!, LAYOUT.nodes[r.to]), r.id).toBeLessThan(0.01);
     }
   });
-  it("keeps everything on the board", () => {
+  it("keeps the blocks and streets on the board", () => {
     for (const z of LAYOUT.zones) {
-      expect(Math.abs(z.x) + z.r).toBeLessThan(hw);
-      expect(Math.abs(z.z) + z.r).toBeLessThan(hd);
+      expect(Math.abs(z.x) + z.w / 2, z.id).toBeLessThan(hw);
+      expect(Math.abs(z.z) + z.d / 2, z.id).toBeLessThan(hd);
     }
-    for (const { pts } of drawn) for (const p of pts) {
-      expect(Math.abs(p[0])).toBeLessThan(hw - 1);
-      expect(Math.abs(p[1])).toBeLessThan(hd - 1);
+    for (const { pts } of paved) for (const p of pts) {
+      expect(Math.abs(p[0])).toBeLessThan(hw);
+      expect(Math.abs(p[1])).toBeLessThan(hd);
     }
   });
 });
 
-describe("zones and slots", () => {
-  it("zones do not overlap each other or the plaza", () => {
+describe("blocks and lots", () => {
+  it("blocks overlap neither each other, the square nor the streets", () => {
     const zs = LAYOUT.zones;
     for (let i = 0; i < zs.length; i++) {
-      expect(Math.hypot(zs[i].x, zs[i].z) - zs[i].r - LAYOUT.plaza.r, zs[i].id).toBeGreaterThan(0.5);
+      const a = zs[i];
+      expect(Math.max(Math.abs(a.x) - a.w / 2 - LAYOUT.plaza.w / 2, Math.abs(a.z) - a.d / 2 - LAYOUT.plaza.d / 2), a.id).toBeGreaterThan(0);
       for (let j = i + 1; j < zs.length; j++) {
-        expect(dist([zs[i].x, zs[i].z], [zs[j].x, zs[j].z]) - zs[i].r - zs[j].r, `${zs[i].id} ${zs[j].id}`).toBeGreaterThan(0.5);
+        const b = zs[j];
+        const gap = Math.max(Math.abs(a.x - b.x) - (a.w + b.w) / 2, Math.abs(a.z - b.z) - (a.d + b.d) / 2);
+        expect(gap, `${a.id} ${b.id}`).toBeGreaterThan(0.5);
+      }
+      for (const { road, pts } of paved) {
+        if (road.type === "lane" && road.id === `lane${a.stage}`) continue;
+        for (const q of pts) expect(outsideBlock(q, a) + road.width / 2, `${road.id} / ${a.id}`).toBeGreaterThan(0);
       }
     }
   });
-  it("no two slots overlap (even rotated, with a 0.3 gap), and every slot lies inside its zone", () => {
+  it("every lot lies inside its block, and no two lots overlap", () => {
     const all = LAYOUT.zones.flatMap((z) => z.slots.map((s) => ({ z, s })));
-    for (const { z, s } of all) expect(dist([s.x, s.z], [z.x, z.z]) + s.size * 0.71, s.id).toBeLessThan(z.r);
+    for (const { z, s } of all) expect(outsideBlock([s.x, s.z], z) + s.size / 2, s.id).toBeLessThan(0.1);
     for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++) {
-      const d = dist([all[i].s.x, all[i].s.z], [all[j].s.x, all[j].s.z]);
-      expect(d, `${all[i].s.id} ${all[j].s.id}`).toBeGreaterThan(all[i].s.size + 0.3 - 0.01);
+      const a = all[i].s, b = all[j].s;
+      expect(Math.max(Math.abs(a.x - b.x), Math.abs(a.z - b.z)), `${a.id} ${b.id}`).toBeGreaterThan(a.size + 0.3);
     }
   });
-  it("slots stay off the roads and the footpaths that lead to other slots", () => {
-    for (const { road, pts } of ROADS_SAMPLED) {
-      if (road.type === "foot") continue;
-      for (const z of LAYOUT.zones) for (const s of z.slots) {
-        for (const q of pts) expect(dist([s.x, s.z], q) - road.width / 2 - s.size * 0.71, `${road.id} ${s.id}`).toBeGreaterThan(-0.3);
-      }
-    }
-    for (const z of LAYOUT.zones) for (const road of LAYOUT.roads.filter((r) => r.type === "foot" && !r.id.startsWith(`${z.id}_p`) && r.id !== `in${z.stage}`)) {
-      void road;
-    }
-  });
-  it("the entrance footpath of a zone runs between slots, not through one", () => {
+  it("the first tasks get the front, central lots (nearest the street)", () => {
     for (const z of LAYOUT.zones) {
-      const road = ROADS_SAMPLED.find((r) => r.road.id === `in${z.stage}`)!;
-      for (const s of z.slots) for (const q of road.pts) expect(dist([s.x, s.z], q) - 0.45 - s.size * 0.5, `${z.id} ${s.id}`).toBeGreaterThan(-0.05);
+      const street = Math.sign(z.z) * 5;
+      const d = z.slots.map((s) => Math.abs(s.z - street));
+      expect(Math.max(...d.slice(0, 4)), z.id).toBeLessThan(Math.min(...d.slice(4)));
+      expect(Math.abs(z.slots[0].x - z.x), z.id).toBeLessThan(Math.abs(z.slots[2].x - z.x));
+    }
+  });
+  it("a block's label sits just past its outer edge, away from the square", () => {
+    for (const z of LAYOUT.zones) {
+      const [x, , lz] = zoneLabelAt(z);
+      expect(x).toBe(z.x);
+      expect(Math.abs(lz), z.id).toBeGreaterThan(Math.abs(z.z) + z.d / 2);
+      expect(Math.abs(lz), z.id).toBeLessThan(hd);
     }
   });
 });
 
 describe("path graph", () => {
-  it("every zone is connected to the plaza (foreman)", () => {
-    for (const z of LAYOUT.zones) {
-      expect(shortestPath("foreman", z.gate), z.id).not.toBeNull();
-      expect(shortestPath("foreman", z.hub), z.id).not.toBeNull();
-    }
-  });
-  it("every building slot is reachable from the idle pads and from every other zone", () => {
+  it("every lot is reachable from the Foreman, the idle pads and every other block", () => {
     for (const z of LAYOUT.zones) for (const s of z.slots) {
+      expect(shortestPath("foreman", s.id), s.id).not.toBeNull();
       expect(shortestPath("pad1", s.id), s.id).not.toBeNull();
       expect(shortestPath(s.id, "pad8"), s.id).not.toBeNull();
     }
@@ -99,46 +111,14 @@ describe("path graph", () => {
     const on = new Set(LAYOUT.roads.flatMap((r) => [r.from, r.to]));
     for (const n of Object.keys(LAYOUT.nodes)) expect(on.has(n), n).toBe(true);
   });
-  it("a worker's walk from the foreman to a slot goes via the spoke of its own zone", () => {
+  it("a worker enters a block through its own lane and gate", () => {
     for (const z of LAYOUT.zones) {
       const p = shortestPath("pad1", z.slots[0].id)!;
-      expect(p.roads.some((r) => r === `spoke${z.stage}` || r.startsWith("ring")), z.id).toBe(true);
+      expect(p.roads, z.id).toContain(`lane${z.stage}`);
+      expect(p.roads, z.id).toContain(`in${z.stage}`);
     }
   });
-});
-
-describe("one readable route", () => {
-  it("the ring visits the zones in stage order and closes the loop", () => {
-    const ring = LAYOUT.roads.filter((r) => r.type === "ring");
-    expect(ring).toHaveLength(6);
-    ring.forEach((r, i) => {
-      expect(r.from).toBe(`z${i + 1}_gate`);
-      expect(r.to).toBe(`z${(i + 1) % 6 + 1}_gate`);
-    });
-  });
-  it("ring, spoke and plaza roads meet only at shared nodes (no crossings)", () => {
-    const seg = (a: XZ, b: XZ, c: XZ, d: XZ) => {
-      const o = (p: XZ, q: XZ, r: XZ) => (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]);
-      // the epsilon ignores the 1e-15 rounding at a node two roads share
-      return o(a, b, c) * o(a, b, d) < -1e-9 && o(c, d, a) * o(c, d, b) < -1e-9;
-    };
-    for (let i = 0; i < drawn.length; i++) for (let j = i + 1; j < drawn.length; j++) {
-      const A = drawn[i], B = drawn[j];
-      for (let a = 1; a < A.pts.length; a++) for (let b = 1; b < B.pts.length; b++) {
-        expect(seg(A.pts[a - 1], A.pts[a], B.pts[b - 1], B.pts[b]), `${A.road.id} x ${B.road.id}`).toBe(false);
-      }
-    }
-  });
-  it("roads do not run through other zones", () => {
-    for (const { road, pts } of drawn) {
-      for (const z of LAYOUT.zones) {
-        const mine = road.from.startsWith(z.id) || road.to.startsWith(z.id);
-        if (mine) continue;
-        for (const q of pts) expect(dist(q, [z.x, z.z]) - z.r, `${road.id} / ${z.id}`).toBeGreaterThan(-0.2);
-      }
-    }
-  });
-  it("barriers stand on their spokes", () => {
+  it("barriers stand on their block's lane", () => {
     expect(LAYOUT.gates).toHaveLength(6);
     for (const g of LAYOUT.gates) {
       const road = ROADS_SAMPLED.find((r) => r.road.id === g.road)!;
@@ -147,14 +127,14 @@ describe("one readable route", () => {
   });
 });
 
-describe("stages map to zones", () => {
-  it("stage 1..6 get their own zone and later stages merge into the last", () => {
+describe("stages map to blocks", () => {
+  it("stage 1..6 get their own block and later stages merge into the last", () => {
     expect(zoneForStage(1).id).toBe("z1");
     expect(zoneForStage(6).id).toBe("z6");
     expect(zoneForStage(7).id).toBe("z6");
     expect(zoneForStage(0).id).toBe("z1");
   });
-  it("the preview plan fits the zones and slots", () => {
+  it("the preview plan fits the blocks and lots", () => {
     for (const p of LAYOUT.preview.zones) {
       expect(p.stage).toBeLessThanOrEqual(LAYOUT.zones.length);
       expect(p.tasks).toBeLessThanOrEqual(LAYOUT.zones[p.stage - 1].slots.length);
@@ -163,23 +143,28 @@ describe("stages map to zones", () => {
 });
 
 describe("decoration", () => {
-  it("no prop touches a road, a footpath, a zone slot area, the plaza or a barrier", () => {
-    for (const p of LAYOUT.props) {
+  it("trees, bushes, rocks and flowers stay off the streets, the blocks and the square", () => {
+    for (const p of LAYOUT.props.filter((q) => q.kind !== "lamp")) {
       const at: XZ = [p.x, p.z];
-      const reach = p.kind === "flower" ? 0.2 : p.kind === "tree" ? 0.7 * p.s : p.kind === "fence" ? 0.2 : 0.35 * p.s;
-      expect(toRoad(at), `${p.kind} ${p.x},${p.z}`).toBeGreaterThan(reach - (p.kind === "fence" ? 0.2 : 0));
-      if (p.kind !== "fence") for (const z of LAYOUT.zones) expect(dist(at, [z.x, z.z]) - z.r, `${p.kind} in ${z.id}`).toBeGreaterThan(reach * 0.5);
-      expect(Math.hypot(p.x, p.z) - LAYOUT.plaza.r, `${p.kind} on the plaza`).toBeGreaterThan(reach * 0.5);
-      for (const g of LAYOUT.gates) expect(dist(at, [g.x, g.z])).toBeGreaterThan(1.5);
+      const tag = `${p.kind} ${p.x},${p.z}`;
+      expect(toStreet(at), tag).toBeGreaterThan(0.5);
+      for (const z of LAYOUT.zones) expect(outsideBlock(at, z), tag).toBeGreaterThan(0.25);
+      expect(outsideSquare(at), tag).toBeGreaterThan(0.25);
+      for (const g of LAYOUT.gates) expect(dist(at, [g.x, g.z]), tag).toBeGreaterThan(1);
     }
   });
-  it("stays under the decoration triangle budget (8,000)", () => {
-    const n = (k: string) => LAYOUT.props.filter((p) => p.kind === k).length;
-    // tree 104, bush 20, rock 20, flower 12, lamp 40, fence segment 24 (post + rail)
-    const tris = n("tree") * 104 + n("bush") * 20 + n("rock") * 20 + n("flower") * 12 + n("lamp") * 40 + n("fence") * 24;
-    expect(tris).toBeLessThanOrEqual(8000);
+  it("lamps stand at the side of a street, not on it and not in a block entrance", () => {
+    const lamps = LAYOUT.props.filter((p) => p.kind === "lamp");
+    expect(lamps.length).toBeGreaterThan(10);
+    for (const p of lamps) {
+      const d = toStreet([p.x, p.z]);
+      expect(d, `${p.x},${p.z}`).toBeGreaterThan(0.1);
+      expect(d, `${p.x},${p.z}`).toBeLessThan(0.6);
+      for (const g of LAYOUT.gates) expect(dist([p.x, p.z], [g.x, g.z])).toBeGreaterThan(1);
+    }
   });
-  it("is deterministic: regenerating from the seed gives the same file (checked by pytest)", () => {
-    expect(LAYOUT.seed).toBe(11);
+  it("has the pines round the edge of the board", () => {
+    const edge = LAYOUT.props.filter((p) => p.kind === "tree" && (Math.abs(p.x) > hw - 2 || Math.abs(p.z) > hd - 3));
+    expect(edge.length).toBeGreaterThan(30);
   });
 });

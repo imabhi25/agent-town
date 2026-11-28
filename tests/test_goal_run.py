@@ -102,6 +102,23 @@ async def test_goal_runs_to_success_with_ordering_and_dependency_outputs(client,
     types = await _event_types(pool)
     assert types.count("goal.succeeded") == 1 and types.count("task.awaiting_approval") == 1
 
+    # Every task job reported 25/50/75 while it ran, before its job.succeeded (the town raises
+    # each building from these). The planner job is not a building and reports nothing.
+    rows = await pool.fetch(
+        "SELECT type, payload FROM events WHERE type IN ('job.progress', 'job.succeeded') "
+        "ORDER BY id"
+    )
+    task_jobs = {str(r["id"]) for r in await pool.fetch("SELECT id FROM jobs WHERE type = 'task'")}
+    progress: dict[str, list[int]] = {}
+    for r in rows:
+        p = json.loads(r["payload"])
+        if r["type"] == "job.progress":
+            assert "job_id" in p and p["worker"]
+            progress.setdefault(p["job_id"], []).append(p["percent"])
+        elif p["job_id"] in task_jobs:
+            assert progress.get(p["job_id"]) == [25, 50, 75]
+    assert set(progress) == task_jobs
+
 
 async def test_parallel_tasks_are_queued_together(client, pool, redis):
     """t2 and t3 both depend only on t1, so both are queued the moment t1 succeeds."""

@@ -238,9 +238,9 @@ The row lock makes two workers claiming at once take turns, so the second always
 
 **Why the scene reads only the event store.** Recorded traces and the live WebSocket already go through one store (deduped by id, ordered), so feeding the 3D view from it means a recording and a live run can never look different, and nothing animates unless an event said so.
 
-**Zones are DAG stages.** Tasks carry no kind or group, and adding one would mean changing the engine and re-recording the traces. A task's stage (1 + the deepest stage among its dependencies) is already in `task.created.depends_on`, works for every recorded trace, and gives the plan a natural left-to-right-around-the-ring reading. More than 6 stages merge into the last zone.
+**Zones are DAG stages.** Tasks carry no kind or group, and adding one would mean changing the engine and re-recording the traces. A task's stage (1 + the deepest stage among its dependencies) is already in `task.created.depends_on`, works for every recorded trace, and gives the plan a natural reading round the square. More than 6 stages merge into the last zone.
 
-**The layout is data.** `docs/reference/town-layout.json` is written by a seeded script and read by the app and its tests: zones, 8 slots each, roads as spline centrelines, the path graph, barriers and props. Tests check no overlaps, every slot reachable from the plaza, one non-crossing main ring, props off the roads, the decoration triangle budget, and that every preset and recorded trace fits.
+**The layout is data.** `docs/reference/town-layout.json` is written by a seeded script and read by the app and its tests: zones, 8 slots each, roads as spline centrelines, the path graph, barriers and props. Tests check no overlaps, every slot reachable from the plaza, props off the streets, blocks and square, lamps beside the streets, and that every preset and recorded trace fits. (Since the mockup layout, the original ring of zones and its arrows are gone; see below.)
 
 **Static geometry is merged, repeated things are instanced.** Roads, plaza, foundations, robots and lamps are one mesh with vertex colours; trees, bushes, rocks, flowers, fences and road arrows are InstancedMeshes. Phase A draws in 40 calls and 14k triangles against budgets of 150 and 56k.
 
@@ -260,18 +260,65 @@ The row lock makes two workers claiming at once take turns, so the second always
 **Recorded locally, not from the deployed site.** The live demo runs two workers with a 45 s lease
 to save free-tier Redis commands, so a crash and recovery would take most of a minute to show. The
 GIF instead runs the same engine locally with the mock planner and mock LLM (no API spend) and
-shorter timings: 3 to 3.5 s per mock call, 1.5 s heartbeat TTL, 2.5 s lease, and the GIF plays
+shorter timings: a 3 s build per task (`TASK_BUILD_SECONDS=3`), 1.5 s heartbeat TTL, 2.5 s lease, and the GIF plays
 at 1.2x. The code path is the
 real one: the killed worker's message stays unacknowledged, `XAUTOCLAIM` hands it to another
 worker, and the database ends with one stored result per job (checked after recording).
 
 **Scripted, so it can be re-recorded.** `web/scripts/record-demo.mjs` drives the page with
-Playwright: type a goal, wait for a worker that holds a task job (the planner job is instant, so it
-needs the same job on two polls), kill that worker, wait for the job to show up on a different
+Playwright: type a goal, wait until two workers hold the two parallel stage-2 tasks (they have
+just started a 3 s build, so the job is surely still running), kill one of them, wait for the job to show up on a different
 worker, start a fresh worker, approve the last task. The numbered captions are an overlay added by
 the script only. Frames come from a CDP screencast (JPEG plus real timestamps) rather than
 Playwright's `recordVideo`, whose low-bitrate VP8 smeared the 3D scene. When the map changes,
 rerun the script and ffmpeg.
+
+## Agents visibly build the town (job.progress)
+**The town finishes because the work finishes, not because of an animation.** Before this, a mock
+task job took 0.5 to 1.5 s and a robot needed about 4 s to walk to its zone, so most buildings
+popped up before their robot arrived. Now a goal's task job takes `TASK_BUILD_SECONDS` (default 4 s)
+on the mock provider, robots walk at 7 m/s (about 2 s to any zone), and the last roof lands on the
+last `task.succeeded`, which is the event that completes the goal. Floods, chaos jobs and the
+planner job are not buildings and stay fast. Real Gemini calls take their own time.
+
+**Progress is a real event, not a time estimate.** While a task job runs, the worker writes
+`job.progress {job_id, worker, percent}` at 25, 50 and 75% (100% is `job.succeeded`). The walls of
+the building rise to that height inside a wooden scaffold; the roof drops on and the windows light
+up only on success. A UI timer could have faked the same picture, but then the height would be a
+guess; with the event, "the building is half built" means "the worker said it is half done", and a
+recording replays exactly what the engine did. Gemini gives no partial progress, so a real call
+goes from scaffold to built in one step.
+
+**Progress is cosmetic, so it guards nothing.** It is written in its own small statement, outside
+the completion transaction, and only `WHERE` the job is still `running` and `locked_by` this worker,
+so a worker that lost its job (killed and recovered elsewhere, or beaten by another delivery) cannot
+report on it. Delivery stays at-least-once: a duplicate or late progress event is harmless because
+the town model only ever raises a building within an attempt (`max`), and `job.started`,
+`job.recovered`, `job.retry_scheduled` and `job.dead` reset it to the ground. A page that connects
+mid-job can now place the job's robot from its next progress event (the snapshot has no job-to-task
+link).
+
+**A failing attempt stops early.** A real provider answers 429/500 without doing the work, so a
+mock call that is going to fail reports one step (the scaffold goes up) and then fails, instead of
+building to 75% first. That keeps the retries recording at 25 s instead of 52 s.
+
+**Cost on the live demo.** Three extra events per task attempt, about 15 per goal. With the 30
+goals per day cap that is under 500 extra Redis stream writes a day, well inside the budget guard.
+
+**Look: the owner's mockup, not just its mood.** A first pass kept the old ring of round zones
+with path arrows and only borrowed the mockup's colours; the owner rejected it ("use the image").
+The town is now laid out like the mockup: a paved square with a fountain in front of the town hall
+(where the Foreman stands), a loop of lavender-grey cobbled streets round it, six rectangular
+blocks of cottage lots facing those streets (stages 1-3 along the near street, 4-6 along the far
+one), pines round the edge of the board and between the blocks, and lamps along the streets. The
+camera is turned 45 degrees so the board reads as a diamond, as in the mockup, and is fitted to
+the town rather than the whole board so the cottages read bigger. Path arrows and zone discs are
+gone: a worker's walk already shows the route. Lots no task uses hold a small garden (a pine and
+two bushes), so empty blocks look planted rather than bare. Cost stays small: streets are textured
+strips (one canvas cobble texture), static geometry is merged, trees and gardens are instanced,
+the lamp halos are one Points object, and five warm point lights over the square are used only at
+high quality. A cottage is a stone footing, a wall box with timber beams, a door, windows sharing
+one material that lights when the task succeeds, a steep gable roof, a chimney and a dormer.
 
 ## Chaos campaign: checking the delivery guarantee under real crashes
 **Why separate processes and SIGKILL.** The older chaos test (`app/chaos.py`) cancels asyncio tasks inside one process. That is a good fast test, but a cancelled task still unwinds its stack, and everything shares one Redis and Postgres connection pool. `scripts/chaos_campaign.py` runs each worker and the dispatcher as its own process (`app/chaos_proc.py`) and kills it with SIGKILL, so nothing in the process runs after the kill: Postgres rolls back its open transaction when the socket drops, the stream message stays pending, the heartbeat key expires on its own. The engine code is the production code; only the clocks are short and the LLM is the mock.
