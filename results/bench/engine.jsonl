@@ -1,0 +1,21 @@
+{"kind": "meta", "run": "20261125T231840Z", "cpu": "Intel(R) Xeon(R) Processor @ 2.30GHz", "cores": 4, "python": "3.12.3", "postgres": "16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)", "mock_latency_s": [0.05, 0.2]}
+{"kind": "throughput", "workers": 1, "jobs": 100, "seconds": 12.2, "jobs_per_s": 8.2, "ideal_jobs_per_s": 8.0}
+{"kind": "latency", "workers": 1, "offered_jobs_per_s": 4.9, "jobs": 72, "p50_ms": 157, "p95_ms": 225, "p99_ms": 233}
+{"kind": "throughput", "workers": 2, "jobs": 200, "seconds": 13.38, "jobs_per_s": 14.9, "ideal_jobs_per_s": 16.0}
+{"kind": "latency", "workers": 2, "offered_jobs_per_s": 8.9, "jobs": 130, "p50_ms": 138, "p95_ms": 229, "p99_ms": 248}
+{"kind": "throughput", "workers": 4, "jobs": 400, "seconds": 12.5, "jobs_per_s": 32.0, "ideal_jobs_per_s": 32.0}
+{"kind": "latency", "workers": 4, "offered_jobs_per_s": 19.2, "jobs": 278, "p50_ms": 150, "p95_ms": 229, "p99_ms": 240}
+{"kind": "throughput", "workers": 8, "jobs": 800, "seconds": 12.91, "jobs_per_s": 62.0, "ideal_jobs_per_s": 64.0}
+{"kind": "latency", "workers": 8, "offered_jobs_per_s": 37.2, "jobs": 539, "p50_ms": 157, "p95_ms": 224, "p99_ms": 242}
+{"kind": "throughput", "workers": 16, "jobs": 1600, "seconds": 12.83, "jobs_per_s": 124.7, "ideal_jobs_per_s": 128.0}
+{"kind": "latency", "workers": 16, "offered_jobs_per_s": 74.8, "jobs": 1069, "p50_ms": 153, "p95_ms": 231, "p99_ms": 247}
+{"kind": "throughput", "workers": 32, "jobs": 3200, "seconds": 13.3, "jobs_per_s": 240.6, "ideal_jobs_per_s": 256.0}
+{"kind": "latency", "workers": 32, "offered_jobs_per_s": 144.4, "jobs": 2014, "p50_ms": 159, "p95_ms": 236, "p99_ms": 250}
+{"kind": "recovery", "trial": 1, "lease_s": 15.0, "heartbeat_ttl_s": 6.0, "recovery_interval_s": 5.0, "kill_to_reclaim_s": 14.81, "kill_to_done_s": 16.82}
+{"kind": "recovery", "trial": 2, "lease_s": 15.0, "heartbeat_ttl_s": 6.0, "recovery_interval_s": 5.0, "kill_to_reclaim_s": 14.81, "kill_to_done_s": 16.82}
+{"kind": "recovery", "trial": 3, "lease_s": 15.0, "heartbeat_ttl_s": 6.0, "recovery_interval_s": 5.0, "kill_to_reclaim_s": 19.77, "kill_to_done_s": 21.77}
+{"kind": "recovery", "trial": 4, "lease_s": 15.0, "heartbeat_ttl_s": 6.0, "recovery_interval_s": 5.0, "kill_to_reclaim_s": 14.77, "kill_to_done_s": 16.78}
+{"kind": "recovery", "trial": 5, "lease_s": 15.0, "heartbeat_ttl_s": 6.0, "recovery_interval_s": 5.0, "kill_to_reclaim_s": 19.78, "kill_to_done_s": 21.79}
+{"kind": "recovery", "trial": 6, "lease_s": 15.0, "heartbeat_ttl_s": 6.0, "recovery_interval_s": 5.0, "kill_to_reclaim_s": 14.78, "kill_to_done_s": 16.79}
+{"kind": "recovery", "trial": 7, "lease_s": 15.0, "heartbeat_ttl_s": 6.0, "recovery_interval_s": 5.0, "kill_to_reclaim_s": 14.79, "kill_to_done_s": 16.79}
+{"kind": "recovery", "trial": 8, "lease_s": 15.0, "heartbeat_ttl_s": 6.0, "recovery_interval_s": 5.0, "kill_to_reclaim_s": 14.81, "kill_to_done_s": 16.82}

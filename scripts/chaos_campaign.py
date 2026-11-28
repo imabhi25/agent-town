@@ -136,8 +136,11 @@ class RunResult:
 class Procs:
     """The worker and dispatcher processes of one run."""
 
-    def __init__(self, env: dict, unsafe: bool, failure_rate: float):
+    def __init__(
+        self, env: dict, unsafe: bool, failure_rate: float, worker_args: tuple[str, ...] = ()
+    ):
         self.env, self.unsafe, self.failure_rate = env, unsafe, failure_rate
+        self.worker_args = worker_args  # extra app.chaos_proc flags (used by bench_engine.py)
         self.workers: dict[str, subprocess.Popen] = {}
         self.dispatcher: subprocess.Popen | None = None
         self._next = 1
@@ -154,7 +157,7 @@ class Procs:
     def start_worker(self) -> str:
         wid = f"w{self._next}"
         self._next += 1
-        args = ["worker", wid, "--failure-rate", str(self.failure_rate)]
+        args = ["worker", wid, "--failure-rate", str(self.failure_rate), *self.worker_args]
         if self.unsafe:
             args.append("--unsafe")
         self.workers[wid] = self._spawn(*args)
