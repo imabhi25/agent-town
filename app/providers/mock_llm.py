@@ -9,6 +9,7 @@ job payload's `mock_mode`), then the random `failure_rate`, then success.
 
 import asyncio
 import random
+from collections.abc import Awaitable, Callable
 from enum import StrEnum
 
 from app.config import settings
@@ -23,10 +24,19 @@ class FailureMode(StrEnum):
     HANG = "hang"  # never answers: only a caller-side timeout can end the call
 
 
+PROGRESS_STEPS = 4  # a call that reports progress reports 25, 50 and 75 (100 is job.succeeded)
+
+ProgressFn = Callable[[int], Awaitable[None]]
+
+
 class ProviderError(Exception):
     def __init__(self, status: int, message: str):
         super().__init__(message)
         self.status = status
+
+
+# Errors a provider returns without doing the work (used to end a progress-reporting call early).
+ANSWERS_AT_ONCE = (FailureMode.RATE_LIMIT, FailureMode.SERVER_ERROR, FailureMode.BAD_REQUEST)
 
 
 class MockLLM:
@@ -42,24 +52,45 @@ class MockLLM:
         self.max_latency = settings.mock_max_latency if max_latency is None else max_latency
         self.rng = rng or random.Random()
 
+    def _pick(self, mode: FailureMode | str | None) -> FailureMode:
+        """The explicit mode, else a random failure at `failure_rate`, else success."""
+        if mode is None and self.rng.random() < self.failure_rate:
+            mode = self.rng.choice([FailureMode.RATE_LIMIT, FailureMode.SERVER_ERROR])
+        return FailureMode(mode) if mode is not None else FailureMode.SUCCESS
+
     async def complete(
         self,
         prompt: str,
         *,
         mode: FailureMode | str | None = None,
         latency: float | None = None,
+        on_progress: ProgressFn | None = None,
     ) -> dict:
         """Return a deterministic JSON-serialisable result, or raise like a real provider would.
 
         `latency` (seconds) overrides the configured random latency for this one call.
+        `on_progress` (a goal's task job): the call takes `settings.task_build_seconds` unless
+        `latency` says otherwise, split into PROGRESS_STEPS sleeps, and reports the percentage
+        done after each sleep but the last (100% is the job.succeeded event).
         """
-        if latency is None:
-            latency = self.rng.uniform(self.min_latency, self.max_latency)
-        await asyncio.sleep(latency)
-
-        if mode is None and self.rng.random() < self.failure_rate:
-            mode = self.rng.choice([FailureMode.RATE_LIMIT, FailureMode.SERVER_ERROR])
-        mode = FailureMode(mode) if mode is not None else FailureMode.SUCCESS
+        if on_progress is None:
+            if latency is None:
+                latency = self.rng.uniform(self.min_latency, self.max_latency)
+            await asyncio.sleep(latency)
+            mode = self._pick(mode)
+        else:
+            mode = self._pick(mode)  # known up front: a failing build stops early
+            # A goal task: the work takes the build time and is reported in steps. An error ends
+            # the work early (a real provider answers 429/500 without doing the work), so a
+            # failing attempt reports one step and then fails, and a retry does not cost a full
+            # build. HANG and TIMEOUT still wait, as without progress.
+            if latency is None:
+                latency = settings.task_build_seconds
+            steps = 1 if mode in ANSWERS_AT_ONCE else PROGRESS_STEPS
+            for step in range(1, steps + 1):
+                await asyncio.sleep(latency / PROGRESS_STEPS)
+                if step < PROGRESS_STEPS:
+                    await on_progress(100 * step // PROGRESS_STEPS)
 
         if mode is FailureMode.RATE_LIMIT:
             raise ProviderError(429, "mock provider error 429")

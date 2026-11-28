@@ -17,7 +17,11 @@ class RoutingProvider:
     def __init__(self, mock: MockLLM, client, model: str, cap: DailyCap):
         self.mock, self.client, self.model, self.cap = mock, client, model, cap
 
-    async def complete(self, prompt: str, *, mode=None, latency=None, real: bool = False) -> dict:
+    async def complete(
+        self, prompt: str, *, mode=None, latency=None, real: bool = False, on_progress=None
+    ) -> dict:
+        # Gemini gives no partial progress, so a real call reports none: its building goes from
+        # scaffold straight to built. The mock fallback reports progress like any mock call.
         if real and mode is None and latency is None and await self.cap.acquire():
             try:
                 response = await self.client.aio.models.generate_content(
@@ -26,7 +30,7 @@ class RoutingProvider:
             except errors.APIError as e:
                 raise ProviderError(int(e.code or 500), f"gemini: {e.message}") from e
             return {"text": response.text or "", "source": "gemini"}
-        return await self.mock.complete(prompt, mode=mode, latency=latency)
+        return await self.mock.complete(prompt, mode=mode, latency=latency, on_progress=on_progress)
 
 
 def build_provider(redis, api_key: str, model: str, daily_cap: int):

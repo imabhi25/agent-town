@@ -51,3 +51,33 @@ async def test_latency_override_does_not_block_the_event_loop():
     t.cancel()
     assert time.monotonic() - start >= 0.2
     assert ticks >= 5  # the loop kept running while the mock "waited"
+
+
+async def test_progress_is_reported_in_steps_and_uses_the_build_time(monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "task_build_seconds", 0.08)
+    llm = MockLLM(min_latency=0, max_latency=0)
+    seen: list[int] = []
+
+    async def on_progress(p: int) -> None:
+        seen.append(p)
+
+    start = time.monotonic()
+    await llm.complete("hello", on_progress=on_progress)
+    assert seen == [25, 50, 75]  # 100 is the job.succeeded event, not a progress event
+    assert time.monotonic() - start >= 0.08  # a goal task takes the build time, not 0s
+
+
+async def test_a_failing_call_reports_one_step_then_fails_early():
+    llm = MockLLM(min_latency=0, max_latency=0)
+    seen: list[int] = []
+
+    async def on_progress(p: int) -> None:
+        seen.append(p)
+
+    start = time.monotonic()
+    with pytest.raises(ProviderError):
+        await llm.complete("hello", mode="500", latency=0.4, on_progress=on_progress)
+    assert seen == [25]  # the scaffold went up, then the provider said no
+    assert time.monotonic() - start < 0.3  # a quarter of the build time, not all of it

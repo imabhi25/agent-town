@@ -46,21 +46,21 @@ test.describe("backend unreachable", () => {
   });
 
   test("the DLQ preset shows a dead job, then the replay succeeds", async ({ page }) => {
-    test.setTimeout(60_000); // ~540 software-rendered frames are simulated on a slow runner
+    test.setTimeout(120_000); // ~1,000 software-rendered frames are simulated on a slow runner
     // The page clock is frozen and driven by the test, so "5.5 seconds of trace" is exact, not a
     // race against a slow machine.
     await page.clock.install({ time: new Date("2026-06-01T00:00:00Z") });
     await page.clock.pauseAt(new Date("2026-06-01T00:00:01Z"));
     await page.goto("/");
     await page.getByRole("button", { name: "DLQ, approval and replay" }).click();
-    await expect(page.getByText("0/39 events")).toBeVisible(); // loaded, waiting for the clock
-    await page.clock.runFor(5500); // the doomed job reaches the DLQ at 4.97s
+    await expect(page.getByText("0/51 events")).toBeVisible(); // loaded, waiting for the clock
+    await page.clock.runFor(11000); // the doomed job reaches the DLQ at 10.65s
     await expect(summary(page)).toContainText("1 dead");
     await expect(summary(page)).toContainText("1 awaiting approval");
     // the approval card and the Replay button are there but cannot be clicked on a recording
     await expect(page.getByRole("button", { name: "Approve" })).toBeDisabled();
     await expect(page.getByRole("list").getByRole("button", { name: "Replay" })).toBeDisabled();
-    await page.clock.runFor(3600); // approved at 7.5s, replayed at 8.5s, succeeded at 9.0s
+    await page.clock.runFor(6700); // approved at 13.2s, replayed at 14.2s, succeeded at 17.2s
     await expect(summary(page)).toContainText("0 dead");
     await expect(summary(page)).not.toContainText("awaiting approval");
     await expect(page.getByRole("group", { name: "Playback" }).getByRole("button", { name: "Replay" })).toBeVisible();
@@ -75,7 +75,7 @@ test.describe("backend unreachable", () => {
     await page.waitForTimeout(800);
     expect(await progress.textContent()).toBe(frozen);
     await page.getByRole("button", { name: "Restart" }).click();
-    await expect(progress).toHaveText(/^\d+\/28 events/);
+    await expect(progress).toHaveText(/^\d+\/40 events/);
   });
 
   test("goes to 'Live Backend Offline' after 60 seconds without an answer", async ({ page }) => {

@@ -18,6 +18,13 @@ def _free_text_planner(monkeypatch):
     monkeypatch.setattr(settings, "planner", "gemini")
 
 
+@pytest.fixture(autouse=True)
+def _fast_builds(monkeypatch):
+    """Goal task jobs take settings.task_build_seconds (4s by default, so the town is watchable).
+    Tests run them in a blink; tests about progress set their own value."""
+    monkeypatch.setattr(settings, "task_build_seconds", 0.02)
+
+
 TRUNCATE_ALL = "TRUNCATE goals, tasks, jobs, job_outputs, outbox, events CASCADE"
 
 

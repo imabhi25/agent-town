@@ -4,7 +4,7 @@
 import { LAYOUT, shortestPath, type XZ } from "./town";
 import type { TownModel, WorkerView } from "./townModel";
 
-export const WALK_SPEED = 4; // metres per second at rest. Not in the design brief (it never arrived): change here.
+export const WALK_SPEED = 7; // metres per second at rest: a robot reaches any zone in about 2s, well inside a 4s build. Change here.
 export const CATCH_UP = 12; // metres: farther than this behind and the worker hurries, so replay never lags
 
 export class Walker {

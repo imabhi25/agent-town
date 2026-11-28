@@ -44,13 +44,17 @@ function Probe() {
   return null;
 }
 
-/** Keeps the whole board in view: the default distance is recomputed from the viewport on resize,
+/** The view is fitted to the town (streets and blocks) rather than the whole board, so the board's
+ * diamond tips, which are only trees, may run off the edges and the cottages read bigger. */
+const VIEW = 0.8;
+
+/** Keeps the town in view: the default distance is recomputed from the viewport on resize,
  * and the zoom limits stay relative to it. A user who has zoomed keeps their zoom ratio. */
 function Rig() {
   const { camera, size, controls } = useThree();
   const last = useRef<number | null>(null);
   useEffect(() => {
-    const fit = fitDistance(LAYOUT.board.w, LAYOUT.board.d, size.width / Math.max(1, size.height));
+    const fit = fitDistance(LAYOUT.board.w * VIEW, LAYOUT.board.d * VIEW, size.width / Math.max(1, size.height));
     const ratio = last.current ? camera.position.length() / last.current : 1;
     const [x, y, z] = cameraPosition(fit * ratio);
     camera.position.set(x, y, z);
@@ -69,36 +73,45 @@ function Rig() {
 
 const PAN = { x: 8, z: 6 };
 
+/** The building the latest event was about, as a point for the Foreman to face. */
+function foremanLook(model?: TownModel): [number, number] | null {
+  const t = model?.focusTaskId ? model.tasks.find((x) => x.id === model.focusTaskId) : undefined;
+  const slot = t ? LAYOUT.zones[t.zone - 1]?.slots[t.slot] : undefined;
+  return slot ? [slot.x, slot.z] : null;
+}
+
 export default function Scene3D({ quality = "high", model, onWorkerTap }: { quality?: Quality; model?: TownModel; onWorkerTap?: (id: string) => void }) {
   // No model = the Phase A static preview; with one, the town is built from events.
   const plan = useMemo<Plan | undefined>(() => (model ? model.zones.map((z) => ({ stage: z.zone, tasks: z.tasks })) : undefined), [model?.zones]); // eslint-disable-line react-hooks/exhaustive-deps
+  const taken = useMemo(() => (model ? new Set(model.tasks.map((t) => LAYOUT.zones[t.zone - 1]?.slots[t.slot]?.id ?? "")) : undefined), [model?.tasks]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <Canvas
       shadows="soft"
       dpr={[1, 2]} // never more than 2x pixel density
       camera={{ fov: FOV, near: 0.5, far: 220, position: cameraPosition(48) }}
-      gl={{ antialias: true, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.15 }}
+      gl={{ antialias: true, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.65 }}
       data-testid="canvas3d"
     >
       <color attach="background" args={[C.bg]} />
       <fog attach="fog" args={[C.bg, 90, 160]} />
-      <hemisphereLight args={["#fff8f0", "#d9d3e8", 1.5]} />
+      {/* night: a lavender sky light and a cool moon; the warm light comes from lamps and windows */}
+      <hemisphereLight args={["#c9c0e6", "#3a3048", 1.8]} />
       <directionalLight
-        position={[14, 26, 12]}
-        intensity={2.1}
-        color="#fff3e0"
+        position={[-12, 26, 14]}
+        intensity={1.5}
+        color="#cfc6ff"
         castShadow={quality === "high"}
         shadow-mapSize={[2048, 2048]}
         shadow-bias={-0.0004}
         shadow-radius={4}
-        shadow-camera-left={-26}
-        shadow-camera-right={26}
+        shadow-camera-left={-22}
+        shadow-camera-right={22}
         shadow-camera-top={20}
         shadow-camera-bottom={-20}
         shadow-camera-near={1}
         shadow-camera-far={80}
       />
-      <TownStatic quality={quality} plan={plan} circuitOpen={model?.circuitOpen} />
+      <TownStatic quality={quality} plan={plan} taken={taken} circuitOpen={model?.circuitOpen} foremanLook={foremanLook(model)} built={model?.goalStatus === "succeeded"} />
       {model && <TownLive model={model} onWorkerTap={onWorkerTap} />}
       <OrbitControls
         makeDefault

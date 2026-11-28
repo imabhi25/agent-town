@@ -8,7 +8,7 @@ afterEach(cleanup);
 
 const task = (over: Partial<TaskView>): TaskView => ({
   id: "t", key: "t1", name: "Research", stage: 1, zone: 1, slot: 0, status: "planned", jobId: null, worker: null,
-  attempt: 0, retryAtMs: null, needsApproval: false, ...over,
+  attempt: 0, retryAtMs: null, needsApproval: false, progress: 0, ...over,
 });
 const model = (tasks: TaskView[], over: Partial<TownModel> = {}): TownModel => ({
   ...EMPTY_MODEL, tasks, zones: [{ zone: 1, tasks: tasks.length, built: tasks.filter((t) => t.status === "succeeded").length }], ...over,

@@ -97,3 +97,24 @@ async def test_ensure_group_is_idempotent(redis):
     await ensure_group(redis)
     await ensure_group(redis)  # BUSYGROUP is ignored
     assert [g["name"] for g in await redis.xinfo_groups(STREAM)] == [GROUP]
+
+
+async def test_progress_is_only_recorded_while_the_worker_owns_the_running_job(pool):
+    """A worker that lost its job (killed and recovered elsewhere, or the job already finished)
+    must not report progress on it."""
+    from app.worker import _progress_reporter
+
+    job_id = await pool.fetchval(
+        "INSERT INTO jobs (type, payload, status, locked_by) "
+        "VALUES ('task', '{}'::jsonb, 'running', 'w1') RETURNING id"
+    )
+    await _progress_reporter(pool, job_id, "w1")(25)
+    await _progress_reporter(pool, job_id, "w2")(50)  # not the owner
+    await pool.execute("UPDATE jobs SET status = 'succeeded' WHERE id = $1", job_id)
+    await _progress_reporter(pool, job_id, "w1")(75)  # finished
+    rows = await pool.fetch("SELECT payload FROM events WHERE type = 'job.progress'")
+    import json as _json
+
+    assert [_json.loads(r["payload"]) for r in rows] == [
+        {"job_id": str(job_id), "worker": "w1", "percent": 25}
+    ]

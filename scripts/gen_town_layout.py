@@ -1,12 +1,21 @@
-"""Write docs/reference/town-layout.json: the whole town as data (zones, building slots, roads, the
-path graph, gates, decoration). Deterministic: a fixed seed, so the committed JSON can always be
-regenerated and compared. The web app and its tests read the JSON; nothing is hard-coded in scene code.
+"""Write docs/reference/town-layout.json: the whole town as data (blocks of building lots, the
+square, streets, the path graph, gates, decoration). Deterministic: a fixed seed, so the committed
+JSON can always be regenerated and compared. The web app and its tests read the JSON; nothing is
+hard-coded in scene code.
 
     python scripts/gen_town_layout.py
 
-Coordinates are metres on a 40 x 30 board: x to the right, z towards the viewer, origin at the centre.
+The plan follows the owner's mockup: a square town on a dark board. In the middle, a paved square
+with a fountain in front of the town hall (where the Foreman stands). Two long cobblestone streets
+run east-west above and below the square, joined by two short side streets, so the square sits
+inside a loop of streets. Six blocks of cottage lots face those streets, three below (stages 1-3,
+nearest the camera, left to right) and three above (stages 4-6, right to left). Pine trees line the
+edge of the board and the gaps between blocks, lamps line the streets.
+
+Coordinates are metres on a 34 x 32 board: x to the right, z towards the viewer, origin at the centre.
 """
 
+import itertools
 import json
 import math
 import random
@@ -16,24 +25,24 @@ OUT = Path(__file__).resolve().parent.parent / "docs" / "reference" / "town-layo
 SEED = 11
 rnd = random.Random(SEED)
 
-BOARD = {"w": 40, "d": 30, "corner": 1.2}
-ZONE_R = 4.6
-SLOT_COUNT = 8  # a plan has at most 8 tasks, so a zone never needs more
-SLOT_RING = 3.0
-SLOT_SIZE = 1.4
-PLAZA_R = 3.4
-RING_W, SPOKE_W, FOOT_W = 1.8, 1.7, 0.7
-
-# Six zone sites, in plan-stage order (stage 1 .. stage 6) around the centre plaza. The ring road
-# visits them in this order, so the main route reads as one loop.
-ZONES = [
-    ("z1", -13.0, 1.5),
-    ("z2", -9.0, -8.0),
-    ("z3", 3.0, -9.5),
-    ("z4", 13.0, -5.0),
-    ("z5", 12.0, 8.0),
-    ("z6", -3.0, 9.5),
-]
+BOARD = {"w": 34, "d": 32, "corner": 0.6}
+STREET_Z = 5.0  # the two east-west streets
+SIDE_X = 7.0  # the two short north-south streets that close the loop round the square
+STREET_END = 15.5
+STREET_W, LANE_W, FOOT_W = 1.7, 0.8, 0.7
+BLOCK_X = [-10.5, 0.0, 10.5]
+BLOCK_W, BLOCK_D = 9.2, 7.2  # paved block, lots inside
+LOT = 1.9  # lot size (a plan has at most 8 tasks, so 8 lots per block)
+LOT_X = [
+    -1.25,
+    1.25,
+    -3.65,
+    3.65,
+]  # front row first, from the middle out: the first tasks are central
+FRONT, BACK = 2.3, 6.3  # lot row distance from the street centreline
+LANE = 4.3  # the lane between the rows, where the block's hub is
+FOUNTAIN = [0.0, 1.8]
+HALL = {"x": 0.0, "z": -2.8, "w": 5.0, "d": 2.2}
 
 nodes: dict[str, list[float]] = {}
 roads: list[dict] = []
@@ -43,225 +52,160 @@ def r2(v):
     return [round(v[0], 2), round(v[1], 2)]
 
 
-def add_road(id, type, width, a, b, mid=(), interior=False):
-    pts = [nodes[a]] + [r2(p) for p in mid] + [nodes[b]]
+def node(name, x, z):
+    nodes[name] = r2([x, z])
+    return name
+
+
+def add_road(id, type, width, a, b):
     roads.append(
-        dict(id=id, type=type, width=width, **{"from": a, "to": b}, interior=interior, points=pts)
+        dict(
+            id=id,
+            type=type,
+            width=width,
+            **{"from": a, "to": b},
+            interior=False,
+            points=[nodes[a], nodes[b]],
+        )
     )
 
 
-def toward(frm, to, d):
-    dx, dz = to[0] - frm[0], to[1] - frm[1]
-    L = math.hypot(dx, dz)
-    return [frm[0] + dx / L * d, frm[1] + dz / L * d], math.atan2(dz, dx)
-
-
-# ---- centre plaza: foreman's podium, idle pads, gate nodes on a ring road -----------------------
-nodes["foreman"] = [0.0, 0.0]
+# ---- the square: fountain, idle pads round it, the Foreman in front of the town hall -------------
+node("foreman", 0.0, -1.0)
 pads = []
 for k in range(8):
     a = math.radians(22.5 + k * 45)
-    p = r2([1.7 * math.cos(a), 1.7 * math.sin(a)])
-    pads.append(p)
-    nodes[f"pad{k + 1}"] = p
+    pads.append(r2([FOUNTAIN[0] + 2.1 * math.cos(a), FOUNTAIN[1] + 2.1 * math.sin(a)]))
+    nodes[f"pad{k + 1}"] = pads[-1]
 
+# ---- streets -------------------------------------------------------------------------------------
+# South street (z = +5) and north street (z = -5), each split at the block entrances and the side
+# street junctions so walks can turn there.
+for side, sz in (("s", STREET_Z), ("n", -STREET_Z)):
+    stops = [("end_w", -STREET_END)]
+    for i, bx in enumerate(BLOCK_X):
+        stops.append((f"g{i}", bx))
+    stops += [("jw", -SIDE_X), ("je", SIDE_X), ("end_e", STREET_END)]
+    stops.sort(key=lambda s: s[1])
+    names = [node(f"{side}_{n}", x, sz) for n, x in stops]
+    for a, b in itertools.pairwise(names):
+        add_road(f"street_{a}_{b}", "street", STREET_W, a, b)
+# side streets, split at the middle where the square's paths join them
+for side, sx in (("w", -SIDE_X), ("e", SIDE_X)):
+    node(f"side_{side}", sx, FOUNTAIN[1])
+    add_road(f"street_n_j{side}_side_{side}", "street", STREET_W, f"n_j{side}", f"side_{side}")
+    add_road(f"street_side_{side}_s_j{side}", "street", STREET_W, f"side_{side}", f"s_j{side}")
+
+# the square's paths: pads reach the nearest of the west, east and south exits; the Foreman's pad
+for k, p in enumerate(pads, start=1):
+    dx, dz = p[0] - FOUNTAIN[0], p[1] - FOUNTAIN[1]
+    exit_ = "s_g1" if dz > 1.0 else ("side_w" if dx < 0 else "side_e")
+    add_road(f"plaza_pad{k}", "plaza", 1.0, f"pad{k}", exit_)
+add_road("foot_foreman", "foot", FOOT_W, "foreman", "pad6")
+
+# ---- blocks (zones) ------------------------------------------------------------------------------
+# Stage order: 1-3 along the south street from west to east, 4-6 along the north street from east
+# to west, so the stages go round the square.
+BLOCKS = [("s", 0, +1), ("s", 1, +1), ("s", 2, +1), ("n", 2, -1), ("n", 1, -1), ("n", 0, -1)]
 zones = []
-for zid, cx, cz in ZONES:
-    n = zid[1:]
-    e, theta = toward(
-        (cx, cz), (0, 0), ZONE_R + 0.8
-    )  # gate: just outside the perimeter, facing the plaza
-    nodes[f"{zid}_gate"] = r2(e)
-    nodes[f"{zid}_hub"] = [cx, cz]
-    g, _ = toward((0, 0), (cx, cz), 2.9)
-    nodes[f"g{n}"] = r2(g)
+gates = []
+for n, (street, bi, sgn) in enumerate(BLOCKS, start=1):
+    zid = f"z{n}"
+    bx = BLOCK_X[bi]
+    sz = sgn * STREET_Z
+    cz = sz + sgn * (BLOCK_D / 2 + STREET_W / 2 + 0.25)
+    gate = node(f"{zid}_gate", bx, sz + sgn * 1.25)
+    hub = node(f"{zid}_hub", bx, sz + sgn * LANE)
+    add_road(f"lane{n}", "lane", LANE_W, f"{street}_g{bi}", gate)
+    add_road(f"in{n}", "foot", FOOT_W, gate, hub)
     slots = []
-    for k in range(SLOT_COUNT):
-        a = theta + math.radians(22.5 + k * 45 + rnd.uniform(-3, 3))
-        rad = SLOT_RING + rnd.uniform(-0.08, 0.08)
-        x, z = cx + rad * math.cos(a), cz + rad * math.sin(a)
-        slots.append(
-            {
-                "id": f"{zid}_s{k + 1}",
-                "x": round(x, 2),
-                "z": round(z, 2),
-                "size": SLOT_SIZE,
-                "rot": round(rnd.uniform(-8, 8), 1),
-            }
-        )
-        nodes[f"{zid}_s{k + 1}"] = [round(x, 2), round(z, 2)]
+    for row, dz in enumerate((FRONT, BACK)):
+        for k, dx in enumerate(LOT_X):
+            i = row * 4 + k + 1
+            x, z = bx + dx + rnd.uniform(-0.05, 0.05), sz + sgn * dz + rnd.uniform(-0.05, 0.05)
+            slots.append(
+                {
+                    "id": f"{zid}_s{i}",
+                    "x": round(x, 2),
+                    "z": round(z, 2),
+                    "size": LOT,
+                    "rot": round(rnd.uniform(-3, 3), 1),  # doors face the viewer
+                }
+            )
+            nodes[f"{zid}_s{i}"] = [round(x, 2), round(z, 2)]
+            add_road(f"{zid}_p{i}", "foot", FOOT_W, hub, f"{zid}_s{i}")
     zones.append(
         {
             "id": zid,
-            "stage": int(n),
-            "x": cx,
-            "z": cz,
-            "r": ZONE_R,
-            "gate": f"{zid}_gate",
-            "hub": f"{zid}_hub",
+            "stage": n,
+            "x": bx,
+            "z": round(cz, 2),
+            "r": round(math.hypot(BLOCK_W, BLOCK_D) / 2, 2),
+            "w": BLOCK_W,
+            "d": BLOCK_D,
+            "gate": gate,
+            "hub": hub,
             "slots": slots,
         }
     )
-
-# plaza ring: gates in angular order joined by arcs
-order = sorted(range(1, 7), key=lambda i: math.atan2(nodes[f"g{i}"][1], nodes[f"g{i}"][0]))
-for i, a in enumerate(order):
-    b = order[(i + 1) % 6]
-    a0 = math.atan2(nodes[f"g{a}"][1], nodes[f"g{a}"][0])
-    a1 = math.atan2(nodes[f"g{b}"][1], nodes[f"g{b}"][0])
-    while a1 <= a0:
-        a1 += 2 * math.pi
-    steps = max(1, int((a1 - a0) / 0.5))
-    mid = [
-        [
-            2.9 * math.cos(a0 + (a1 - a0) * t / (steps + 1)),
-            2.9 * math.sin(a0 + (a1 - a0) * t / (steps + 1)),
-        ]
-        for t in range(1, steps + 1)
-    ]
-    add_road(f"plaza_{a}_{b}", "plaza", 1.4, f"g{a}", f"g{b}", mid)
-# pads and the foreman reach the nearest gate by footpath
-for k in range(8):
-    p = nodes[f"pad{k + 1}"]
-    near = min(range(1, 7), key=lambda i: math.dist(p, nodes[f"g{i}"]))
-    add_road(f"foot_pad{k + 1}", "foot", FOOT_W, f"pad{k + 1}", f"g{near}")
-add_road("foot_foreman", "foot", FOOT_W, "foreman", "pad2")
-
-# spokes: plaza gate -> zone gate, with a gentle bend so they wind
-BEND = [1.0, -1.0, 0.8, -1.0, 1.0, -0.8]
-for i, z in enumerate(zones, start=1):
-    a, b = nodes[f"g{i}"], nodes[f"z{i}_gate"]
-    mx, mz = (a[0] + b[0]) / 2, (a[1] + b[1]) / 2
-    L = math.dist(a, b)
-    nx, nz = -(b[1] - a[1]) / L, (b[0] - a[0]) / L
-    add_road(
-        f"spoke{i}",
-        "spoke",
-        SPOKE_W,
-        f"g{i}",
-        f"z{i}_gate",
-        [[mx + nx * BEND[i - 1], mz + nz * BEND[i - 1]]],
-    )
-    add_road(f"in{i}", "foot", FOOT_W + 0.2, f"z{i}_gate", f"z{i}_hub")
-    for k in range(SLOT_COUNT):
-        add_road(f"z{i}_p{k + 1}", "foot", FOOT_W, f"z{i}_hub", f"z{i}_s{k + 1}")
-
-# the ring: stage 1 -> 2 -> ... -> 6 -> back to 1, passing every zone gate, bowing outwards
-for i in range(1, 7):
-    j = i % 6 + 1
-    a, b = nodes[f"z{i}_gate"], nodes[f"z{j}_gate"]
-    mx, mz = (a[0] + b[0]) / 2, (a[1] + b[1]) / 2
-    L = math.dist(a, b)
-    out = math.hypot(mx, mz) or 1
-    k = 1.6 + (i % 2) * 0.8
-    c1 = [
-        a[0] + (b[0] - a[0]) * 0.33 + mx / out * k * 0.6,
-        a[1] + (b[1] - a[1]) * 0.33 + mz / out * k * 0.9,
-    ]
-    c2 = [
-        a[0] + (b[0] - a[0]) * 0.66 + mx / out * k,
-        a[1] + (b[1] - a[1]) * 0.66 + mz / out * k * 0.5,
-    ]
-    # keep the bends clear of both zones' slots (a ring of 3.0 m plus half a slot and half the road)
-    for c, z in ((c1, zones[i - 1]), (c2, zones[j - 1])):
-        d = math.hypot(c[0] - z["x"], c[1] - z["z"])
-        if d < ZONE_R + 1.7:
-            c[0] = z["x"] + (c[0] - z["x"]) / d * (ZONE_R + 1.7)
-            c[1] = z["z"] + (c[1] - z["z"]) / d * (ZONE_R + 1.7)
-    add_road(f"ring{i}", "ring", RING_W, f"z{i}_gate", f"z{j}_gate", [c1, c2])
-
-
-def catmull(pts, n=20):
-    out = []
-    P = [pts[0]] + pts + [pts[-1]]
-    for i in range(1, len(P) - 2):
-        p0, p1, p2, p3 = P[i - 1], P[i], P[i + 1], P[i + 2]
-        for s in range(n):
-            t = s / n
-            t2, t3 = t * t, t * t * t
-            out.append(
-                [
-                    0.5
-                    * (
-                        2 * p1[j]
-                        + (-p0[j] + p2[j]) * t
-                        + (2 * p0[j] - 5 * p1[j] + 4 * p2[j] - p3[j]) * t2
-                        + (-p0[j] + 3 * p1[j] - 3 * p2[j] + p3[j]) * t3
-                    )
-                    for j in range(2)
-                ]
-            )
-    out.append(pts[-1])
-    return out
-
-
-# a barrier on each spoke, a third of the way out along the curve (the circuit breaker lowers them all)
-gates = []
-for i in range(1, 7):
-    pts = catmull(next(r for r in roads if r["id"] == f"spoke{i}")["points"])
-    k = int(0.35 * (len(pts) - 1))
-    (x, z), (x2, z2) = pts[k], pts[k + 1]
+    # the circuit breaker's barrier, across the block entrance
     gates.append(
         {
-            "id": f"barrier{i}",
-            "road": f"spoke{i}",
-            "x": round(x, 2),
-            "z": round(z, 2),
-            "rot": round(math.degrees(math.atan2(z2 - z, x2 - x)), 1),
+            "id": f"barrier{n}",
+            "road": f"lane{n}",
+            "x": bx,
+            "z": round(sz + sgn * 1.0, 2),
+            "rot": 90.0 if sgn > 0 else -90.0,
         }
     )
 
 # ---- decoration ----------------------------------------------------------------------------------
+street_segs = [(r["points"], r["width"]) for r in roads if r["type"] in ("street", "lane")]
 
 
-drawn = [
-    (catmull(r["points"]), r["width"]) for r in roads if r["type"] in ("ring", "spoke", "plaza")
-]
-feet = [catmull(r["points"], 6) for r in roads if r["type"] == "foot"]
+def seg_dist(p, a, b):
+    ax, az = a
+    bx_, bz = b
+    vx, vz = bx_ - ax, bz - az
+    L2 = vx * vx + vz * vz or 1e-9
+    t = max(0.0, min(1.0, ((p[0] - ax) * vx + (p[1] - az) * vz) / L2))
+    return math.hypot(p[0] - (ax + vx * t), p[1] - (az + vz * t))
 
 
 def road_clear(x, z):
+    return min(seg_dist((x, z), a, b) - w / 2 for (a, b), w in street_segs)
+
+
+def block_clear(x, z):
+    """Distance outside the nearest block rectangle (negative = inside)."""
     best = 1e9
-    for pts, w in drawn:
-        for p in pts:
-            best = min(best, math.hypot(p[0] - x, p[1] - z) - w / 2)
-    for pts in feet:
-        for p in pts:
-            best = min(best, math.hypot(p[0] - x, p[1] - z) - 0.5)
+    for zz in zones:
+        dx = abs(x - zz["x"]) - zz["w"] / 2
+        dz = abs(z - zz["z"]) - zz["d"] / 2
+        best = min(best, max(dx, dz))
     return best
 
 
-def zone_clear(x, z):
-    return min(math.hypot(x - zz["x"], z - zz["z"]) - zz["r"] for zz in zones)
-
-
-def plaza_clear(x, z):
-    return math.hypot(x, z) - (PLAZA_R + 0.3)
-
-
-def gate_clear(x, z):
-    return min(math.hypot(x - g["x"], z - g["z"]) for g in gates)
+def square_clear(x, z):
+    """Distance outside the square (the area inside the street loop)."""
+    return max(abs(x) - (SIDE_X - STREET_W / 2), abs(z) - (STREET_Z - STREET_W / 2))
 
 
 props = []
 
 
-def put(kind, n, clear, smin, smax, colors=0, tries=6000):
+def free(x, z, gap):
+    return all(math.hypot(x - p["x"], z - p["z"]) >= gap for p in props)
+
+
+def put(kind, n, where, gap, smin, smax, colors=0, tries=8000):
     c = 0
     while c < n and tries > 0:
         tries -= 1
-        x, z = rnd.uniform(-19, 19), rnd.uniform(-14, 14)
-        if (
-            road_clear(x, z) < clear
-            or zone_clear(x, z) < clear
-            or plaza_clear(x, z) < clear
-            or gate_clear(x, z) < 2
-        ):
+        x, z = where()
+        if road_clear(x, z) < 0.6 or block_clear(x, z) < 0.3 or square_clear(x, z) < 0.3:
             continue
-        if any(
-            math.hypot(x - p["x"], z - p["z"]) < (clear * 0.9 + 0.5 if p["kind"] == kind else 0.9)
-            for p in props
-        ):
+        if abs(x) > BOARD["w"] / 2 - 0.7 or abs(z) > BOARD["d"] / 2 - 0.7 or not free(x, z, gap):
             continue
         d = {
             "kind": kind,
@@ -275,47 +219,59 @@ def put(kind, n, clear, smin, smax, colors=0, tries=6000):
         c += 1
 
 
-put("tree", 24, 1.6, 0.9, 1.4, 3)
-put("bush", 22, 1.0, 0.7, 1.1, 2)
-put("rock", 8, 1.0, 0.6, 1.0)
-put("flower", 30, 0.8, 0.8, 1.0, 4)
-# lamps just outside the spokes
-for i in range(1, 7):
-    pts = catmull(next(r for r in roads if r["id"] == f"spoke{i}")["points"])
-    for t in (0.2, 0.62):
-        p = pts[int(t * (len(pts) - 1))]
-        q = pts[min(len(pts) - 1, int(t * (len(pts) - 1)) + 1)]
-        L = math.hypot(q[0] - p[0], q[1] - p[1]) or 1
-        nx, nz = -(q[1] - p[1]) / L, (q[0] - p[0]) / L
-        for sgn in (1, -1):
-            x, z = p[0] + nx * (SPOKE_W / 2 + 0.7) * sgn, p[1] + nz * (SPOKE_W / 2 + 0.7) * sgn
-            if road_clear(x, z) > 0.4 and gate_clear(x, z) > 1.6 and zone_clear(x, z) > 0.4:
-                props.append({"kind": "lamp", "x": round(x, 2), "z": round(z, 2), "s": 1.0})
-                break
-# fences: segments along each zone's perimeter, leaving a gap at the entrance
-for zz in zones:
-    gx, gz = nodes[zz["gate"]]
-    ent = math.atan2(gz - zz["z"], gx - zz["x"])
-    n = 26
-    for k in range(n):
-        a = ent + math.radians(30) + (2 * math.pi - math.radians(60)) * (k + 0.5) / n
-        x, z = zz["x"] + (zz["r"] - 0.15) * math.cos(a), zz["z"] + (zz["r"] - 0.15) * math.sin(a)
-        if abs(x) < 19 and abs(z) < 14.2 and road_clear(x, z) > 0.5:
-            props.append(
-                {
-                    "kind": "fence",
-                    "x": round(x, 2),
-                    "z": round(z, 2),
-                    "s": 1.0,
-                    "rot": round(-math.degrees(a) + 90, 1),
-                }
-            )
+def border():
+    """The band round the edge of the board, beyond the streets and blocks."""
+    hw, hd = BOARD["w"] / 2, BOARD["d"] / 2
+    side = rnd.random()
+    if side < 0.5:
+        return rnd.uniform(-hw, hw), rnd.choice([-1, 1]) * rnd.uniform(hd - 2.6, hd)
+    return rnd.choice([-1, 1]) * rnd.uniform(hw - 1.4, hw), rnd.uniform(-hd, hd)
+
+
+def anywhere():
+    return rnd.uniform(-BOARD["w"] / 2, BOARD["w"] / 2), rnd.uniform(
+        -BOARD["d"] / 2, BOARD["d"] / 2
+    )
+
+
+# lamps first, on both sides of the streets, every few metres, clear of the block entrances
+for sz in (STREET_Z, -STREET_Z):
+    for x in [-14.0, -8.6, -3.4, 3.4, 8.6, 14.0]:
+        for off in (-1, 1):
+            lx, lz = x + (0.9 if off < 0 else -0.9), sz + off * (STREET_W / 2 + 0.35)
+            if (
+                all(abs(lx - bx) > 1.4 for bx in BLOCK_X)
+                and block_clear(lx, lz) > 0.2
+                and road_clear(lx, lz) > 0.15
+            ):
+                props.append({"kind": "lamp", "x": round(lx, 2), "z": round(lz, 2), "s": 1.0})
+for sx in (-SIDE_X, SIDE_X):
+    for z in (-2.6, 2.6):
+        lx = sx + (STREET_W / 2 + 0.35) * (1 if sx > 0 else -1)
+        props.append({"kind": "lamp", "x": round(lx, 2), "z": z, "s": 1.0})
+
+put("tree", 46, border, 1.25, 0.85, 1.3, 3)  # pines (c 0-1) and a few round trees (c 2)
+put("tree", 14, anywhere, 1.2, 0.8, 1.15, 3)
+put("bush", 26, anywhere, 0.9, 0.6, 1.0, 2)
+put("flower", 34, anywhere, 0.6, 0.8, 1.0, 4)
+put("rock", 8, border, 1.0, 0.5, 0.9)
 
 doc = {
-    "version": 2,
+    "version": 3,
     "seed": SEED,
     "board": BOARD,
-    "plaza": {"x": 0, "z": 0, "r": PLAZA_R, "foreman": [0.0, 0.0], "podium_r": 0.9, "pads": pads},
+    "plaza": {
+        "x": 0,
+        "z": 0,
+        "r": 3.2,
+        "w": round(2 * SIDE_X - STREET_W, 2),
+        "d": round(2 * STREET_Z - STREET_W, 2),
+        "fountain": FOUNTAIN,
+        "hall": HALL,
+        "foreman": nodes["foreman"],
+        "podium_r": 0.7,
+        "pads": pads,
+    },
     "zones": zones,
     "nodes": nodes,
     "roads": roads,

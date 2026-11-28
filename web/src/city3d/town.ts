@@ -1,11 +1,12 @@
 // The town as data. docs/reference/town-layout.json (written by scripts/gen_town_layout.py from a
-// fixed seed) is the single source: zones and their building slots, the plaza, roads (centrelines
-// with a type), the path graph (a road is an edge between two nodes), barriers and decoration.
+// fixed seed) is the single source: blocks (zones) and their building lots, the square, streets
+// (centrelines with a type), the path graph (a road is an edge between two nodes), barriers and
+// decoration. The plan follows the owner's mockup: a square town round a fountain and a town hall.
 // Everything here is pure maths (no WebGL), so the layout is unit tested: see town.test.ts.
 import { CatmullRomCurve3, Vector3 } from "three";
 import raw from "../../../docs/reference/town-layout.json";
 
-export type RoadType = "ring" | "spoke" | "plaza" | "foot";
+export type RoadType = "street" | "lane" | "plaza" | "foot";
 export type PropKind = "tree" | "bush" | "rock" | "flower" | "lamp" | "fence";
 export type XZ = [number, number];
 
@@ -21,9 +22,11 @@ export interface ZoneSpec {
   stage: number; // 1..6: the DAG stage this zone shows
   x: number;
   z: number;
-  r: number;
-  gate: string; // node where the ring road meets the zone
-  hub: string; // node at the zone centre
+  r: number; // radius that contains the whole block
+  w: number; // block size (x)
+  d: number; // block size (z)
+  gate: string; // node at the block entrance, where its lane meets the street
+  hub: string; // node on the lane between the two rows of lots
   slots: SlotSpec[];
 }
 export interface RoadSpec {
@@ -54,7 +57,18 @@ export interface TownLayout {
   version: number;
   seed: number;
   board: { w: number; d: number; corner: number };
-  plaza: { x: number; z: number; r: number; foreman: XZ; podium_r: number; pads: XZ[] };
+  plaza: {
+    x: number;
+    z: number;
+    r: number;
+    w: number; // the paved square inside the loop of streets
+    d: number;
+    fountain: XZ;
+    hall: { x: number; z: number; w: number; d: number }; // the town hall behind the fountain
+    foreman: XZ;
+    podium_r: number;
+    pads: XZ[];
+  };
   zones: ZoneSpec[];
   nodes: Record<string, XZ>;
   roads: RoadSpec[];
@@ -111,7 +125,7 @@ const ADJ = (() => {
   return adj;
 })();
 
-/** Shortest walk between two nodes over all roads (walkable both ways; arrows show the stage flow). */
+/** Shortest walk between two nodes over all roads (every road is walkable both ways). */
 export function shortestPath(from: string, to: string): PathResult | null {
   const dist = new Map<string, number>([[from, 0]]);
   const prev = new Map<string, { node: string; e: Edge }>();
@@ -142,4 +156,10 @@ export function shortestPath(from: string, to: string): PathResult | null {
 export function zoneForStage(stage: number): ZoneSpec {
   const zs = LAYOUT.zones;
   return zs[Math.min(Math.max(stage, 1), zs.length) - 1];
+}
+
+/** Where a block's name label floats: just past the block's outer edge (away from the square), so
+ * from the camera it sits below the near blocks and above the far ones, never over a cottage. */
+export function zoneLabelAt(z: { x: number; z: number; d: number }): [number, number, number] {
+  return [z.x, 0.3, z.z + Math.sign(z.z) * (z.d / 2 + 0.35)];
 }

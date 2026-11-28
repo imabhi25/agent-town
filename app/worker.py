@@ -114,6 +114,36 @@ async def _claim(
         return "claimed", row
 
 
+def _progress_reporter(
+    pool: asyncpg.Pool, job_id: UUID, worker_id: str
+) -> Callable[[int], Awaitable[None]]:
+    """A callback that records `job.progress {job_id, worker, percent}` for a running task job.
+
+    Progress is cosmetic (the town draws how far up a building is), so it is NOT part of the
+    completion transaction and it guards nothing. One rule keeps it honest: the event is written
+    only while this worker still owns the running job, so a worker that lost the job (killed and
+    recovered elsewhere, or already finished by another delivery) cannot report on it. A late or
+    duplicate progress event is harmless: the UI only ever raises a building, and the next
+    job.succeeded / job.retry_scheduled / job.dead overrides it.
+    """
+
+    async def report(percent: int) -> None:
+        await pool.execute(
+            """
+            INSERT INTO events (type, payload)
+            SELECT 'job.progress', $2::jsonb
+            WHERE EXISTS (
+                SELECT 1 FROM jobs WHERE id = $1 AND status = 'running' AND locked_by = $3
+            )
+            """,
+            job_id,
+            json.dumps({"job_id": str(job_id), "worker": worker_id, "percent": percent}),
+            worker_id,
+        )
+
+    return report
+
+
 async def _complete(
     pool: asyncpg.Pool,
     job_id: UUID,
@@ -322,11 +352,12 @@ async def handle_message(
 
         else:
             latency = payload.get("mock_latency")
-            extra = (
-                {"real": True}
-                if fields.get("type") == "task" and getattr(provider, "routes_real", False)
-                else {}
-            )
+            extra: dict = {}
+            if fields.get("type") == "task":
+                # A goal's task is a building in the town: report how far along it is.
+                extra["on_progress"] = _progress_reporter(pool, job_id, worker_id)
+                if getattr(provider, "routes_real", False):
+                    extra["real"] = True
             output = await asyncio.wait_for(
                 provider.complete(
                     payload.get("prompt", ""),
