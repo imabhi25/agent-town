@@ -319,3 +319,18 @@ strips (one canvas cobble texture), static geometry is merged, trees and gardens
 the lamp halos are one Points object, and five warm point lights over the square are used only at
 high quality. A cottage is a stone footing, a wall box with timber beams, a door, windows sharing
 one material that lights when the task succeeds, a steep gable roof, a chimney and a dormer.
+
+## Chaos campaign: checking the delivery guarantee under real crashes
+**Why separate processes and SIGKILL.** The older chaos test (`app/chaos.py`) cancels asyncio tasks inside one process. That is a good fast test, but a cancelled task still unwinds its stack, and everything shares one Redis and Postgres connection pool. `scripts/chaos_campaign.py` runs each worker and the dispatcher as its own process (`app/chaos_proc.py`) and kills it with SIGKILL, so nothing in the process runs after the kill: Postgres rolls back its open transaction when the socket drops, the stream message stays pending, the heartbeat key expires on its own. The engine code is the production code; only the clocks are short and the LLM is the mock.
+
+**Why kill Redis too, and why with its data kept.** Killing Redis drops every client connection mid-command, makes heartbeats expire while their workers are alive (so a live worker's job can be taken over and two workers can run it at once), and forces every component through its reconnect path. Redis runs with AOF and `appendfsync always`, so an acknowledged write survives the kill. Losing Redis data is a different failure, handled by the startup reconcile, and is listed as a limitation rather than mixed into this number.
+
+**Why the checker reads only Postgres.** `app/checker.py` does not know what the run did. It looks at the final rows for the submitted job ids and checks: every job is `succeeded` or `dead` (nothing lost), a succeeded job has exactly one `job_outputs` row and one `job.succeeded` event, and no other job has either. A job running twice is not a violation (that is what at-least-once means); it is counted and published, because it shows the guarantee was actually exercised.
+
+**Why a deliberately broken mode.** A checker that always says "0 violations" could be broken itself. `WorkerExtras.unsafe_ack_before_commit` makes the worker XACK as soon as it claims a job, before the provider call and the commit, which is the classic at-most-once bug. Killing that worker mid-call leaves the job `running` with no pending message, so no one reclaims it, and the checker must report it as lost. The campaign fails if any broken run comes out clean, and every violation kind also has a hand-built unit test (`tests/test_checker.py`). The flag is only set by `app/chaos_proc.py --unsafe`.
+
+**Why the numbers are generated.** The campaign writes one JSON line per run to `results/chaos/campaign.jsonl`; `scripts/chaos_report.py` rewrites the README blocks from it, and a test fails if the README and the file disagree. Nobody types the headline.
+
+**Why the fault phase ends on a stall.** A broken run that lost jobs never finishes, so waiting for "all jobs done" would wait for the timeout. Faults stop when every job is done or nothing has finished for 4 s, then the survivors get a quiet drain period before the check, so a slow-but-correct run is not mistaken for a lost job.
+
+**CI.** A separate job runs 3 correct and 2 broken runs of 150 jobs on every pull request (about a minute) and uploads the JSON lines. It installs `redis-server` because the campaign must own a Redis it can kill; a GitHub service container cannot be killed and restarted from a step.
